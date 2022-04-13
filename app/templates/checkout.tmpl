@@ -1,0 +1,19 @@
+<html>
+	<h1>
+		{{ .title }}
+	</h1>
+	<table border="1">
+    <tr>
+      <th>Product ID</th>
+	  <th>Product Image</th>
+	  <th>Product Quantity</th>
+      <th>Ordered Date</th>
+    </tr>
+	<tr>
+		<th>{{ .checkout.ProductID }}</th>
+		<th>{{ .checkout.Product.Image }}</th>
+		<th>{{ .checkout.ProductQuantity }}</th>
+		<th>{{ .checkout.CreatedAt }}</th>
+	</tr>
+  </table>
+</html>

@@ -1,0 +1,10 @@
+{
+    "products": [
+        {"id": 1, "name": "hunters-race-Vk3QiwyrAUA", "price": 150, "image": "/assets/images/hunters-race-Vk3QiwyrAUA-unsplash.jpg"},
+		{"id": 2, "name": "louis-mornaud-ADvixEYm5qE", "price": 180, "image": "/assets/images/louis-mornaud-ADvixEYm5qE-unsplash.jpg"}
+    ],
+    "users": [
+        {"id": 1, "name": "admin", "password": "admin"},
+        {"id": 2, "name": "scstore", "password": "scstore"}
+    ]
+}

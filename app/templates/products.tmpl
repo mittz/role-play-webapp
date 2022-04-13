@@ -1,0 +1,21 @@
+<html>
+	<h1>
+		{{ .title }}
+	</h1>
+	<table border="1">
+    <tr>
+      <th>Name</th>
+      <th>Price</th>
+	  <th>Image</th>
+	  <th>Action</th>
+    </tr>
+	{{ range .products }}
+		<tr>
+			<th>{{ .Name }}</th>
+			<th>${{ .Price }}</th>
+			<th><img src="{{ .Image }}" width="180" height="130"></th>
+			<th><a href="/product/{{ .ID }}">Detail</a></th>
+		</tr>
+	{{ end }}
+  </table>
+</html>

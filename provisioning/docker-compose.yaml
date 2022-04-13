@@ -1,0 +1,11 @@
+version: "3"
+services:
+  scstore-database:
+    image: postgres:14.2
+    container_name: "scstore-database"
+    environment:
+      - POSTGRES_USER=scstore
+      - POSTGRES_PASSWORD=scstore
+      - POSTGRES_DB=scstore
+    ports:
+      - "15432:5432"

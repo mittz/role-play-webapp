@@ -1,0 +1,7 @@
+{
+    "host": "localhost",
+    "port": 15432,
+    "user": "scstore",
+    "password": "scstore",
+    "dbname": "scstore"
+}

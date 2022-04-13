@@ -1,0 +1,4 @@
+- app.go: Application codes
+- app_test.go: Test codes for app.go
+- templates/: HTML templates
+- assets/: Images, CSS, JS
