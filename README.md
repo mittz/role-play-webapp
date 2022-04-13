@@ -21,7 +21,7 @@ $ git clone https://github.com/mittz/role-play-webapp
 ## Run PostgreSQL Container
 
 ```shell
-$ role-play-webapp/provisioning
+$ cd role-play-webapp/provisioning
 $ docker-compose up -d
 ```
 
