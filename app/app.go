@@ -101,9 +101,9 @@ func SetupRouter(dbh database.DatabaseHandler) *gin.Engine {
 	}
 
 	router := gin.Default()
-	router.Static("/assets", filepath.Join(currDir, "assets"))
-	router.StaticFile("/favicon.ico", filepath.Join(currDir, "assets/favicon.ico"))
-	router.LoadHTMLGlob(currDir + "/templates/*")
+	router.Static("/assets", filepath.Join(currDir, "app/assets"))
+	router.StaticFile("/favicon.ico", filepath.Join(currDir, "app/assets/favicon.ico"))
+	router.LoadHTMLGlob(currDir + "/app/templates/*")
 
 	router.POST("/admin/init", postInitEndpoint)
 
