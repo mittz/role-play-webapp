@@ -43,11 +43,11 @@ type User struct {
 
 type Checkout struct {
 	gorm.Model
-	ProductQuantity uint
 	UserID          uint
 	User            User
 	ProductID       uint
 	Product         Product
+	ProductQuantity uint
 }
 
 type Blob struct {

@@ -1,9 +1,7 @@
 package app
 
 import (
-	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 
@@ -12,6 +10,12 @@ import (
 )
 
 var dbHandler database.DatabaseHandler
+
+// getUserID always returns the same id which is for scstore user.
+// This should be updated when this app implements an authentication feature.
+func getUserID() uint {
+	return uint(2)
+}
 
 func postInitEndpoint(c *gin.Context) {
 	if err := dbHandler.InitDatabase(); err != nil {
@@ -22,7 +26,7 @@ func postInitEndpoint(c *gin.Context) {
 }
 
 func getCheckoutsEndpoint(c *gin.Context) {
-	userID := uint(1)
+	userID := getUserID()
 	checkouts, err := dbHandler.GetCheckouts(userID)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
@@ -35,7 +39,7 @@ func getCheckoutsEndpoint(c *gin.Context) {
 }
 
 func postCheckoutEndpoint(c *gin.Context) {
-	userID := 1
+	userID := getUserID()
 
 	productID, err := strconv.Atoi(c.PostForm("product_id"))
 	if err != nil {
@@ -92,18 +96,13 @@ func getProductsEndpoint(c *gin.Context) {
 	})
 }
 
-func SetupRouter(dbh database.DatabaseHandler) *gin.Engine {
+func SetupRouter(dbh database.DatabaseHandler, assetsDir string, templatesDirMatch string) *gin.Engine {
 	dbHandler = dbh
 
-	currDir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	router := gin.Default()
-	router.Static("/assets", filepath.Join(currDir, "app/assets"))
-	router.StaticFile("/favicon.ico", filepath.Join(currDir, "app/assets/favicon.ico"))
-	router.LoadHTMLGlob(currDir + "/app/templates/*")
+	router.Static("/assets", assetsDir)
+	router.StaticFile("/favicon.ico", filepath.Join(assetsDir, "favicon.ico"))
+	router.LoadHTMLGlob(templatesDirMatch)
 
 	router.POST("/admin/init", postInitEndpoint)
 

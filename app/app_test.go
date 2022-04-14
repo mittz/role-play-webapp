@@ -15,8 +15,11 @@ import (
 
 var dbDevHandler database.DatabaseHandler
 
+const testAssetsDir = "./assets"
+const testTemplatesDirMatch = "./templates/*"
+
 func TestGetProductEndpoint(t *testing.T) {
-	router := SetupRouter(dbDevHandler)
+	router := SetupRouter(dbDevHandler, testAssetsDir, testTemplatesDirMatch)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/product/1", nil)
@@ -28,7 +31,7 @@ func TestGetProductEndpoint(t *testing.T) {
 }
 
 func TestGetProductsEndpoint(t *testing.T) {
-	router := SetupRouter(dbDevHandler)
+	router := SetupRouter(dbDevHandler, testAssetsDir, testTemplatesDirMatch)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/products", nil)
@@ -46,7 +49,7 @@ func TestGetProductsEndpoint(t *testing.T) {
 }
 
 func TestGetCheckoutsEndpoint(t *testing.T) {
-	router := SetupRouter(dbDevHandler)
+	router := SetupRouter(dbDevHandler, testAssetsDir, testTemplatesDirMatch)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/checkouts", nil)
@@ -60,7 +63,7 @@ func TestGetCheckoutsEndpoint(t *testing.T) {
 }
 
 func TestPostCheckoutEndpoint(t *testing.T) {
-	router := SetupRouter(dbDevHandler)
+	router := SetupRouter(dbDevHandler, testAssetsDir, testTemplatesDirMatch)
 
 	values := url.Values{}
 	productID := "1"
