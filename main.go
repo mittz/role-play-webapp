@@ -22,6 +22,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	router := app.SetupRouter(dbHandler)
+	const assetsDir = "./app/assets"
+	const templatesDirMatch = "./app/templates/*"
+
+	router := app.SetupRouter(dbHandler, assetsDir, templatesDirMatch)
 	router.Run(":8080")
 }

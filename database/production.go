@@ -103,12 +103,9 @@ func (dbh ProdDatabaseHandler) GetProducts() ([]Product, error) {
 func (dbh ProdDatabaseHandler) GetCheckouts(userID uint) ([]Checkout, error) {
 	var checkouts []Checkout
 
-	result := dbh.DB.Conn.Find(&checkouts, "user_id = ?", userID)
-	if result.Error != nil {
-		return checkouts, result.Error
-	}
+	err := dbh.DB.Conn.Joins("User").Joins("Product").Find(&checkouts).Where("users.id =?", userID).Error
 
-	return checkouts, nil
+	return checkouts, err
 }
 
 func (dbh ProdDatabaseHandler) CreateCheckout(userID uint, productID uint, productQuantity uint) (uint, error) {
@@ -125,10 +122,7 @@ func (dbh ProdDatabaseHandler) CreateCheckout(userID uint, productID uint, produ
 func (dbh ProdDatabaseHandler) GetCheckout(checkoutID uint) (Checkout, error) {
 	var checkout Checkout
 
-	result := dbh.DB.Conn.First(&checkout, checkoutID)
-	if result.Error != nil {
-		return checkout, result.Error
-	}
+	err := dbh.DB.Conn.Joins("Product").Find(&checkout, checkoutID).Error
 
-	return checkout, nil
+	return checkout, err
 }
