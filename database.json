@@ -1,6 +1,6 @@
 {
-    "host": "localhost",
-    "port": 15432,
+    "host": "scstore-database",
+    "port": 5432,
     "user": "scstore",
     "password": "scstore",
     "dbname": "scstore"
