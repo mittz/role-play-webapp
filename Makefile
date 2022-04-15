@@ -1,5 +1,7 @@
 NAME=scstore
 VERSION=1.0.0
+DOCKER_COMPOSE_PATH=$(shell which docker-compose)
+DOCKER_COMPOSE_VERSION=1.29.2
 
 all:
 	$(MAKE) tests
@@ -30,3 +32,7 @@ start-db:
 
 stop:
 	docker-compose down
+
+upgrade-compose:
+	if [ -e $(DOCKER_COMPOSE_PATH) ]; then sudo rm -f $(DOCKER_COMPOSE_PATH); fi
+	sudo curl -L "https://github.com/docker/compose/releases/download/$(DOCKER_COMPOSE_VERSION)/docker-compose-$(shell uname -s)-$(shell uname -m)" -o ${DOCKER_COMPOSE_PATH} && sudo chmod 755 $(DOCKER_COMPOSE_PATH)

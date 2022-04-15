@@ -6,6 +6,7 @@ This provides ...
 
 * Golang: 1.17 or later
 * Docker Engine: 20.10.13 or later
+* Docker Compose: 1.29.2 or later
 * Terraform:
 
 # Deployment for Web Application on Google Cloud
@@ -25,6 +26,20 @@ $ make all
 ```
 
 Access to `http://localhost` and see if you can see the web site.
+
+If you face the following error, you need to upgrade the docker-compose.
+
+```text
+docker-compose up -d
+ERROR: The Compose file './docker-compose.yaml' is invalid because:
+services.scstore-app.depends_on contains an invalid type, it should be an array
+```
+
+You can upgrade the docker-compose by the following command:
+
+```shell
+$ make upgrade-compose
+```
 
 # Optional: Update Application Codes
 
