@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mittz/scaledce-role-play-series/webapp/database"
+	"github.com/mittz/role-play-webapp/webapp/database"
 )
 
 var dbHandler database.DatabaseHandler

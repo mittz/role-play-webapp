@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/mittz/scaledce-role-play-series/webapp/app"
-	"github.com/mittz/scaledce-role-play-series/webapp/database"
+	"github.com/mittz/role-play-webapp/webapp/app"
+	"github.com/mittz/role-play-webapp/webapp/database"
 )
 
 func main() {
