@@ -17,10 +17,6 @@ func getUserID() uint {
 	return uint(2)
 }
 
-func getIndexEndpoint(c *gin.Context) {
-	c.HTML(http.StatusOK, "index.tmpl", nil)
-}
-
 func postInitEndpoint(c *gin.Context) {
 	if err := dbHandler.InitDatabase(); err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
@@ -107,8 +103,6 @@ func SetupRouter(dbh database.DatabaseHandler, assetsDir string, templatesDirMat
 	router.Static("/assets", assetsDir)
 	router.StaticFile("/favicon.ico", filepath.Join(assetsDir, "favicon.ico"))
 	router.LoadHTMLGlob(templatesDirMatch)
-
-	router.GET("/", getIndexEndpoint)
 
 	router.POST("/admin/init", postInitEndpoint)
 
