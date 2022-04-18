@@ -20,12 +20,12 @@ $ terraform apply
 # Optional: Local Deployment for Web Application
 
 ```shell
-$ git clone git@github.com:mittz/role-play-webapp.git
-$ cd role-play-webapp/webapp
+$ git clone https://github.com/mittz/role-play-webapp
+$ cd role-play-webapp
 $ make all
 ```
 
-Access to `http://localhost:8080/products` and see if you can see the web site.
+Access to `http://localhost` and see if you can see the web site.
 
 If you face the following error, you need to upgrade the docker-compose.
 
