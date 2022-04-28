@@ -28,4 +28,5 @@ Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) for details.
 
 - [webapp](/webapp/): Resources to deploy the web application
 - [benchmark](/benchmark/): Resources to deploy the benchmark application
-- [provisioning](/provisioning/): Resources to provision the web and benchmark applications
+- [provisioning](/provisioning/): Resources to provision the web and benchmark applications..
+
