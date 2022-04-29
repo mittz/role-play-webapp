@@ -24,6 +24,7 @@ func getIndexEndpoint(c *gin.Context) {
 func postInitEndpoint(c *gin.Context) {
 	if err := dbHandler.InitDatabase(); err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	c.String(http.StatusAccepted, "Initiatilized data.")
@@ -34,6 +35,7 @@ func getCheckoutsEndpoint(c *gin.Context) {
 	checkouts, err := dbHandler.GetCheckouts(userID)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	c.HTML(http.StatusOK, "checkouts.tmpl", gin.H{
@@ -48,21 +50,25 @@ func postCheckoutEndpoint(c *gin.Context) {
 	productID, err := strconv.Atoi(c.PostForm("product_id"))
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	productQuantity, err := strconv.Atoi(c.PostForm("product_quantity"))
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	checkoutID, err := dbHandler.CreateCheckout(uint(userID), uint(productID), uint(productQuantity))
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	checkout, err := dbHandler.GetCheckout(checkoutID)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	c.HTML(http.StatusAccepted, "checkout.tmpl", gin.H{
@@ -75,11 +81,13 @@ func getProductEndpoint(c *gin.Context) {
 	productID, err := strconv.Atoi(c.Param("product_id"))
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	product, err := dbHandler.GetProduct(uint(productID))
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	c.HTML(http.StatusOK, "product.tmpl", gin.H{
@@ -92,6 +100,7 @@ func getProductsEndpoint(c *gin.Context) {
 	products, err := dbHandler.GetProducts()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
+		return
 	}
 
 	c.HTML(http.StatusOK, "products.tmpl", gin.H{
