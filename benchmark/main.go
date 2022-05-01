@@ -24,23 +24,24 @@ import (
 )
 
 const (
-	USERS_DATA_FILENAME      = "users.json"
-	MESSAGE_INVALID_ENDPOINT = "invalid endpoint"
-	MESSAGE_INVALID_USERKEY  = "invalid userkey"
-	MESSAGE_ALREADY_INQUEUE  = "already in the queue"
-	REQUEST_TIMEOUT_SECOND   = 10
-	BENCHMARK_TIMEOUT_SECOND = 2
-	WEIGHT_OF_WORKER         = 1
-	REGISTERED_PRODUCTS_NUM  = 200
-	MAX_PRODUCT_QUANTITY     = 10
-	SCORE_GET_PRODUCTS       = 5
-	SCORE_POST_CHECKOUT      = 2
-	SCORE_GET_PRODUCT        = 1
-	SCORE_GET_CHECKOUTS      = 4
-	PRODUCTS_NUM_PER_PAGE    = 2
-	PORT                     = 8081 // TODO: This should be provided through CLI or File
-	NUM_OF_USERS             = 2    // TODO: This should be provided through CLI or File
-	LIMIT_OF_WORKERS         = 1    // TODO: This should be provided through CLI or File
+	USERS_DATA_FILENAME       = "users.json"
+	IMAGEHASHES_DATA_FILENAME = "image_hashes.json"
+	MESSAGE_INVALID_ENDPOINT  = "invalid endpoint"
+	MESSAGE_INVALID_USERKEY   = "invalid userkey"
+	MESSAGE_ALREADY_INQUEUE   = "already in the queue"
+	REQUEST_TIMEOUT_SECOND    = 10
+	BENCHMARK_TIMEOUT_SECOND  = 10
+	WEIGHT_OF_WORKER          = 1
+	REGISTERED_PRODUCTS_NUM   = 100
+	MAX_PRODUCT_QUANTITY      = 10
+	SCORE_GET_PRODUCTS        = 5
+	SCORE_POST_CHECKOUT       = 2
+	SCORE_GET_PRODUCT         = 1
+	SCORE_GET_CHECKOUTS       = 4
+	PRODUCTS_NUM_PER_PAGE     = 100
+	PORT                      = 8081 // TODO: This should be provided through CLI or File
+	NUM_OF_USERS              = 6    // TODO: This should be provided through CLI or File
+	LIMIT_OF_WORKERS          = 2    // TODO: This should be provided through CLI or File
 )
 
 var queue chan Request
@@ -77,8 +78,17 @@ type Worker struct {
 	sem *semaphore.Weighted
 }
 
-type Blob struct {
+type ImageHash struct {
+	Name string
+	Hash string
+}
+
+type UsersBlob struct {
 	Users []User `json:"users"`
+}
+
+type ImageHashesBlob struct {
+	ImageHashes []ImageHash
 }
 
 func init() {
@@ -91,9 +101,21 @@ func init() {
 }
 
 func initImageHashes() map[string]string {
+	jsonFromFile, err := os.ReadFile(IMAGEHASHES_DATA_FILENAME)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var jsonData ImageHashesBlob
+	err = json.Unmarshal(jsonFromFile, &jsonData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	imageHashes = make(map[string]string)
-	imageHashes["hunters-race-Vk3QiwyrAUA-unsplash.jpg"] = "94b74ff9d2dec482cb76c8e595d14522"
-	imageHashes["louis-mornaud-ADvixEYm5qE-unsplash.jpg"] = "3fb74bb187744fe3a1004255761f34b0"
+	for _, imageHash := range jsonData.ImageHashes {
+		imageHashes[imageHash.Name] = imageHash.Hash
+	}
 
 	return imageHashes
 }
@@ -104,7 +126,7 @@ func initUsers() map[string]User {
 		log.Fatal(err)
 	}
 
-	var jsonData Blob
+	var jsonData UsersBlob
 	err = json.Unmarshal(jsonFromFile, &jsonData)
 	if err != nil {
 		log.Fatal(err)
@@ -119,7 +141,10 @@ func initUsers() map[string]User {
 }
 
 func isValidEndpoint(endpoint string) bool {
-	return strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://")
+	return strings.HasPrefix(endpoint, "http://") ||
+		strings.HasPrefix(endpoint, "https://") ||
+		strings.Contains(endpoint, "localhost") ||
+		strings.Contains(endpoint, "127.0.0.1")
 }
 
 func isValidUserKey(userkey string) bool {
@@ -130,6 +155,98 @@ func isValidUserKey(userkey string) bool {
 func isInQueue(userkey string) bool {
 	_, exist := jobInQueue.Load(userkey)
 	return exist
+}
+
+func benchGetProducts(baseURL url.URL) uint {
+	getProductsURL := baseURL
+	getProductsURL.Path = path.Join(getProductsURL.Path, "/products")
+	resp, err := http.Get(getProductsURL.String())
+	if err != nil {
+		log.Printf("%v\n", err)
+	}
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	// Check hashsum of image
+	selection := doc.Find("tr")
+	var imagePaths []string
+	selection.Find("img").Each(func(index int, s *goquery.Selection) {
+		if val, ok := s.Attr("src"); ok {
+			if !strings.HasPrefix(val, "http") {
+				val = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, val)
+			}
+
+			imagePaths = append(imagePaths, val)
+		}
+	})
+
+	productID := rand.Intn(PRODUCTS_NUM_PER_PAGE)
+	if len(imagePaths) <= productID {
+		return 0
+	}
+	imagePath := imagePaths[productID] // TODO: Consider index out of range when the page is empty
+	respImage, err := http.Get(imagePath)
+	if err != nil {
+		log.Printf("%v\n", err)
+	}
+	h := md5.New()
+	if _, err := io.Copy(h, respImage.Body); err != nil {
+		log.Printf("%v\n", err)
+	}
+	respImage.Body.Close()
+
+	// TODO: Check stylesheets
+	resp.Body.Close()
+	if err == nil && resp.StatusCode == http.StatusOK && fmt.Sprintf("%x", h.Sum(nil)) == imageHashes[path.Base(imagePath)] {
+		return SCORE_GET_PRODUCTS
+	}
+
+	return 0
+}
+
+func benchPostCheckout(baseURL url.URL, productID int, productQuantity int) uint {
+	data := url.Values{
+		"product_id":       {fmt.Sprintf("%d", productID)},
+		"product_quantity": {fmt.Sprintf("%d", productQuantity)},
+	}
+	postCheckout := baseURL
+	postCheckout.Path = path.Join(postCheckout.Path, "/checkout")
+	resp, err := http.PostForm(postCheckout.String(), data)
+	resp.Body.Close()
+	if err == nil && resp.StatusCode == http.StatusAccepted { // and content is the same as expected
+		return SCORE_POST_CHECKOUT
+	}
+
+	return 0
+}
+
+func benchGetProduct(baseURL url.URL) uint {
+	getProductURL := baseURL
+	productID := rand.Intn(PRODUCTS_NUM_PER_PAGE)
+	getProductURL.Path = path.Join(getProductURL.Path, "/product", fmt.Sprintf("%d", productID))
+	resp, err := http.Get(getProductURL.String())
+	resp.Body.Close()
+	if err == nil && resp.StatusCode == http.StatusOK { // and content is the same as expected
+		return SCORE_GET_PRODUCT
+	}
+
+	return 0
+}
+
+func benchGetCheckouts(baseURL url.URL, productID int, productQuantity int) uint {
+	getCheckoutsURL := baseURL
+	getCheckoutsURL.Path = path.Join(getCheckoutsURL.Path, "/checkouts")
+	resp, err := http.Get(getCheckoutsURL.String())
+	resp.Body.Close()
+
+	// TODO: Check if the order which is just created exists
+	if err == nil && resp.StatusCode == http.StatusOK { // and content is the same as expected
+		return SCORE_GET_CHECKOUTS
+	}
+
+	return 0
 }
 
 func benchmark(ctx context.Context, endpoint string) (uint, error) {
@@ -150,79 +267,13 @@ LOOP:
 				log.Printf("%v\n", err)
 			}
 
-			// GET: /products 5
-			getProductsURL := *baseURL
-			getProductsURL.Path = path.Join(getProductsURL.Path, "/products")
-			resp, err := http.Get(getProductsURL.String())
-			if err != nil {
-				log.Printf("%v\n", err)
-			}
-			doc, err := goquery.NewDocumentFromReader(resp.Body)
-			if err != nil {
-				panic(err)
-			}
+			productID := rand.Intn(REGISTERED_PRODUCTS_NUM-1) + 1    // Exclude 0
+			productQuantity := rand.Intn(MAX_PRODUCT_QUANTITY-1) + 1 // Exclude 0
 
-			// Check hashsum of image
-			selection := doc.Find("tr")
-			var imagePaths []string
-			selection.Find("img").Each(func(index int, s *goquery.Selection) {
-				if val, ok := s.Attr("src"); ok {
-					if !strings.HasPrefix(val, "http") {
-						val = endpoint + val
-					}
-
-					imagePaths = append(imagePaths, val)
-				}
-			})
-			imagePath := imagePaths[rand.Intn(PRODUCTS_NUM_PER_PAGE)]
-			respImage, err := http.Get(imagePath)
-			if err != nil {
-				log.Printf("%v\n", err)
-			}
-			h := md5.New()
-			if _, err := io.Copy(h, respImage.Body); err != nil {
-				log.Printf("%v\n", err)
-			}
-			respImage.Body.Close()
-
-			// TODO: Check stylesheets
-			resp.Body.Close()
-			if err == nil && resp.StatusCode == http.StatusOK && fmt.Sprintf("%x", h.Sum(nil)) == imageHashes[path.Base(imagePath)] {
-				score += SCORE_GET_PRODUCTS
-			}
-
-			// POST: /checkout 2
-			productID := rand.Intn(REGISTERED_PRODUCTS_NUM)
-			productQuantity := rand.Intn(MAX_PRODUCT_QUANTITY)
-			data := url.Values{
-				"product_id":       {fmt.Sprintf("%d", productID)},
-				"product_quantity": {fmt.Sprintf("%d", productQuantity)},
-			}
-			postCheckout := *baseURL
-			postCheckout.Path = path.Join(postCheckout.Path, "/checkout")
-			resp, err = http.PostForm(postCheckout.String(), data)
-			if err == nil && resp.StatusCode == http.StatusAccepted { // and content is the same as expected
-				score += SCORE_POST_CHECKOUT
-			}
-			resp.Body.Close()
-
-			// GET: /product/:product_id 1
-			getProductURL := *baseURL
-			getProductURL.Path = path.Join(getProductURL.Path, "/product", fmt.Sprintf("%d", productID))
-			resp, err = http.Get(getProductURL.String())
-			if err == nil && resp.StatusCode == http.StatusOK { // and content is the same as expected
-				score += SCORE_GET_PRODUCT
-			}
-			resp.Body.Close()
-
-			// GET: /checkouts 4
-			getCheckoutsURL := *baseURL
-			getCheckoutsURL.Path = path.Join(getCheckoutsURL.Path, "/checkouts")
-			resp, err = http.Get(getCheckoutsURL.String())
-			if err == nil && resp.StatusCode == http.StatusOK { // and content is the same as expected
-				score += SCORE_GET_CHECKOUTS
-			}
-			resp.Body.Close()
+			score += benchGetProducts(*baseURL)
+			score += benchPostCheckout(*baseURL, productID, productQuantity)
+			score += benchGetProduct(*baseURL)
+			score += benchGetCheckouts(*baseURL, productID, productQuantity)
 
 			if score == 0 {
 				break LOOP
@@ -245,6 +296,19 @@ func (w Worker) RunScoring() {
 	w.sem.Acquire(context.Background(), WEIGHT_OF_WORKER)
 
 	job := <-queue
+
+	// Initialize data in user app
+	u, err := url.Parse(job.Endpoint)
+	if err != nil {
+		log.Printf("%v", err)
+	}
+	u.Path = path.Join(u.Path, "/admin/init")
+	resp, err := http.Post(u.String(), "", nil)
+	if err != nil {
+		log.Printf("%v", err)
+	}
+	resp.Body.Close()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*BENCHMARK_TIMEOUT_SECOND)
 	defer cancel()
 	benchScore, err := benchmark(ctx, job.Endpoint)
@@ -272,6 +336,7 @@ func (w Worker) RunScoring() {
 
 func (w Worker) WriteResult() {
 	result := <-results
+	// TODO: Store the result in the database server
 	log.Printf("Score: %d\n", result.Score)
 	jobInQueue.Delete(result.Userkey)
 }
@@ -318,13 +383,25 @@ func timeoutPostBenchmark(c *gin.Context) {
 	c.String(http.StatusRequestTimeout, "Currently we are getting a lot of requests. Please try again later.")
 }
 
-func main() {
-	r := gin.Default()
-
-	r.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Welcome to Scoring Server")
+func getRequestForm(c *gin.Context) {
+	var ldaps []string
+	jobInQueue.Range(func(key, value interface{}) bool {
+		ldaps = append(ldaps, users[key.(string)].LDAP)
+		return true
 	})
 
+	// TODO: Link to the results dashboard (Data Studio)
+	c.HTML(http.StatusOK, "index.tmpl", gin.H{
+		"title": "Welcome to Scoring Server",
+		"ldaps": ldaps,
+	})
+}
+
+func main() {
+	r := gin.Default()
+	r.LoadHTMLGlob("templates/*")
+
+	r.GET("/", getRequestForm)
 	r.POST("/benchmark", timeout.New(
 		timeout.WithTimeout(time.Second*REQUEST_TIMEOUT_SECOND),
 		timeout.WithHandler(postBenchmark),

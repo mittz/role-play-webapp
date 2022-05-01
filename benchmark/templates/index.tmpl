@@ -1,0 +1,14 @@
+<html>
+    <h1>{{ .title }}</h1>
+    <h2>Users in Waiting List</h2>
+    {{ range .ldaps }}
+      {{ . }}
+    {{ end }}
+    <h2>Benchmark Request Form</h2>
+    <form action="/benchmark" method="post">
+        Userkey: <input type="text" name="userkey">
+        Endpoint: <input type="url" name="endpoint">
+        ProjectID: <input type="text" name="project_id">
+        <input type="submit" value="Submit">
+    </form>
+</html>
