@@ -1,0 +1,30 @@
+version: "3"
+services:
+  score-app:
+    image: score:1.0.0
+    environment:
+    - DB_HOSTNAME=score-database
+    - DB_PORT=5432
+    - DB_USERNAME=score
+    - DB_PASSWORD=score
+    - DB_NAME=score
+    - DS_URL=https://datastudio.google.com/s/lygI5Phd6mc
+    ports:
+      - "8081:8080"
+    depends_on:
+      score-database:
+        condition: service_healthy
+  score-database:
+    image: postgres:14.2
+    container_name: "score-database"
+    volumes:
+      - ./volume/score-database/var/lib/postgresql/data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=score
+      - POSTGRES_PASSWORD=score
+      - POSTGRES_DB=score
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
