@@ -9,13 +9,6 @@ all:
 	$(MAKE) start
 
 build:
-	$(MAKE) build-app
-	$(MAKE) build-container
-
-build-app:
-	CGO_ENABLED=0 GOOS=linux go build -o $(NAME) .
-
-build-container:
 	docker build -t $(NAME):$(VERSION) .
 
 tests:
