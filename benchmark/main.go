@@ -435,7 +435,7 @@ LOOP:
 
 func scoreArchitecture(projectID string) (uint, error) {
 	log.Printf("Scoring started - ProjectID: %s\n", projectID)
-	time.Sleep(time.Second * 3) // do scoring
+	time.Sleep(time.Second * 3) // TODO: Implement this
 	log.Printf("Scoring finished - ProjectID: %s\n", projectID)
 	return 2, nil
 }
@@ -455,7 +455,7 @@ func (w Worker) RunScoring() {
 	if err != nil {
 		log.Printf("%v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() // TODO: Fix the scenario when the init path is invalid and this is called
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*BENCHMARK_TIMEOUT_SECOND)
 	defer cancel()
