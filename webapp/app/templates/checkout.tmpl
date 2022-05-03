@@ -4,16 +4,16 @@
 	</h1>
 	<table border="1">
     <tr>
-      <th>Product Name</th>
+      <th>Product ID</th>
 	  <th>Product Image</th>
 	  <th>Product Quantity</th>
       <th>Ordered Date</th>
     </tr>
 	<tr>
-		<th>{{ .checkout.Product.Name }}</th>
-		<th><img src="{{ .checkout.Product.Image }}" width="180" height="130"></th>
-		<th>{{ .checkout.ProductQuantity }}</th>
-		<th>{{ .checkout.CreatedAt }}</th>
+		<td class="product_id">{{ .checkout.Product.ID }}</td>
+		<td class="product_image"><img src="{{ .checkout.Product.Image }}" width="180" height="130"></td>
+		<td class="product_quantity">{{ .checkout.ProductQuantity }}</td>
+		<td class="checkout_date">{{ .checkout.CreatedAt }}</td>
 	</tr>
   </table>
 </html>

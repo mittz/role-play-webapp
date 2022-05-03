@@ -4,17 +4,17 @@
 	</h1>
 	<table border="1">
     <tr>
-      <th>Product Name</th>
+      <th>Product ID</th>
 	  <th>Product Image</th>
 	  <th>Product Quantity</th>
       <th>Ordered Date</th>
     </tr>
 	{{ range .checkouts }}
 		<tr>
-			<th>{{ .Product.Name }}</th>
-			<th>{{ .Product.Image }}</th>
-			<th>{{ .ProductQuantity }}</th>
-            <th>{{ .CreatedAt }}</th>
+			<td class="product_id">{{ .Product.ID }}</td>
+			<td class="product_image">{{ .Product.Image }}</td>
+			<td class="product_quantity">{{ .ProductQuantity }}</td>
+            <td class="checkout_date">{{ .CreatedAt }}</td>
 		</tr>
 	{{ end }}
   </table>
