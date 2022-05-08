@@ -7,20 +7,25 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	asset "cloud.google.com/go/asset/apiv1"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gin-contrib/timeout"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/semaphore"
+	"google.golang.org/api/iterator"
+	assetpb "google.golang.org/genproto/googleapis/cloud/asset/v1"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -39,11 +44,14 @@ const (
 	SCORE_POST_CHECKOUT       = 2
 	SCORE_GET_PRODUCT         = 1
 	SCORE_GET_CHECKOUTS       = 4
+	RATE_NO_RESOURCE          = 0
+	RATE_ZONAL                = 1
+	RATE_REGIONAL             = 2
+	RATE_MULTI_REGIONAL       = 3
 )
 
 var (
 	queue       chan Request
-	results     chan JobHistory
 	jobInQueue  sync.Map
 	worker      Worker
 	imageHashes map[string]string
@@ -66,13 +74,15 @@ type User struct {
 }
 
 type JobHistory struct {
-	ID         uint `gorm:"primary_key"`
-	Userkey    string
-	LDAP       string
-	BenchScore uint
-	PFScore    uint
-	TotalScore uint
-	ExecutedAt time.Time
+	ID                uint `gorm:"primary_key"`
+	Userkey           string
+	LDAP              string
+	BenchScore        uint
+	BenchResultMsg    string
+	PlatformRate      uint
+	PlatformResultMsg string
+	TotalScore        uint
+	ExecutedAt        time.Time
 }
 
 type Worker struct {
@@ -95,7 +105,6 @@ type ImageHashesBlob struct {
 
 func init() {
 	queue = make(chan Request, getNumOfUsers())
-	results = make(chan JobHistory, getNumOfUsers())
 	jobInQueue = sync.Map{}
 	imageHashes = initImageHashes()
 	worker = Worker{sem: semaphore.NewWeighted(int64(getLimitOfWorkers())), conn: initDBConn()}
@@ -239,7 +248,7 @@ func benchGetProducts(baseURL url.URL) uint {
 	}
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		panic(err)
+		log.Printf("%v\n", err)
 	}
 
 	// Check hashsum of image
@@ -400,14 +409,11 @@ func benchGetCheckouts(baseURL url.URL, productID int, productQuantity int) uint
 }
 
 func benchmark(ctx context.Context, endpoint string) (uint, error) {
-	log.Printf("Benchmark started - Endpoint: %s\n", endpoint)
-
 	score := uint(0)
-LOOP:
 	for {
 		select {
 		case <-ctx.Done():
-			break LOOP
+			return score, nil
 		default: // do benchmark
 			rand.Seed(time.Now().UnixNano())
 			baseURL, err := url.Parse(endpoint)
@@ -424,74 +430,249 @@ LOOP:
 			score += benchGetCheckouts(*baseURL, productID, productQuantity)
 
 			if score == 0 {
-				break LOOP
+				return score, fmt.Errorf("unable to receive expected results from the endpoint (%s)", endpoint)
+			}
+		}
+	}
+}
+
+type AvailabilityChecker struct {
+	projectID string
+}
+
+type LabelLocation struct {
+	label    string
+	location string
+}
+
+type LabelRegion struct {
+	label  string
+	region string
+}
+
+type ResourceInfo struct {
+	labels               map[string]string
+	assetType            string
+	location             string
+	additionalAttributes map[string]interface{}
+}
+
+func NewAvailabilityChecker() *AvailabilityChecker {
+	return new(AvailabilityChecker)
+}
+
+func (ac *AvailabilityChecker) SetProjectID(projectID string) {
+	ac.projectID = projectID
+}
+
+func (ac *AvailabilityChecker) GetAllResourceInfo() ([]ResourceInfo, error) {
+	// $ gcloud asset search-all-resources \
+	// --scope projects/[PROJECT_ID] \
+	scope := fmt.Sprintf("projects/%s", ac.projectID)
+	ctx := context.Background()
+	client, err := asset.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	req := &assetpb.SearchAllResourcesRequest{
+		Scope: scope,
+	}
+
+	it := client.SearchAllResources(ctx, req)
+	var resources []ResourceInfo
+	for {
+		resource, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		ri := ResourceInfo{
+			assetType:            resource.AssetType,
+			location:             resource.Location,
+			labels:               resource.Labels,
+			additionalAttributes: resource.AdditionalAttributes.AsMap(),
+		}
+		resources = append(resources, ri)
+	}
+
+	return resources, nil
+}
+
+func (ac *AvailabilityChecker) CheckRuleViolation(resourceInfo []ResourceInfo,
+	validAssetTypes map[string]interface{}, invalidAssetTypes map[string]interface{}) error {
+	// TODO: Check if the resources are not exceeded the limits
+	for _, ri := range resourceInfo {
+		if _, ok := invalidAssetTypes[ri.assetType]; ok {
+			return fmt.Errorf("%s can't be used in this contest", ri.assetType)
+		}
+	}
+
+	return nil
+}
+
+func getMin(x, y int) int {
+	if x < y {
+		return x
+	}
+
+	return y
+}
+
+func (ac *AvailabilityChecker) GetMinAvailabilityScore(info []ResourceInfo, assetTypes map[string]interface{}) uint {
+	roles := map[string]interface{}{
+		"service_role_webapp": struct{}{},
+		"service_role_db":     struct{}{},
+	}
+
+	labels := make(map[string]interface{})
+
+	// locByLabels[tag][location]: interface{}
+	// e.g. locByLabels[service_role_webapp][us-central1-c]: struct{}{}
+	locationLabels := make(map[LabelLocation]interface{})
+	for _, r := range info {
+		if _, ok := assetTypes[r.assetType]; !ok {
+			continue
+		}
+
+		for key, val := range r.labels {
+			if _, ok := roles[key]; ok && val == "true" {
+				labels[key] = struct{}{}
+				locationLabels[LabelLocation{label: key, location: r.location}] = struct{}{}
 			}
 		}
 	}
 
-	log.Printf("Benchmark finished - Endpoint: %s\n", endpoint)
-	return score, nil
+	// Either service_role_webapp or service_role_db is not present
+	if len(labels) < 2 {
+		return RATE_NO_RESOURCE
+	}
+
+	labelRegion := make(map[LabelRegion]interface{})
+	for ll := range locationLabels {
+		l := strings.Split(ll.location, "-")
+		region := strings.Join(l[0:2], "-")
+		labelRegion[LabelRegion{label: ll.label, region: region}] = struct{}{}
+	}
+
+	countRegionsByLabel := make(map[string]int) // countRegionsByLabel["service_role_webapp"]: 2 (regions)
+	for lr := range labelRegion {
+		countRegionsByLabel[lr.label]++
+	}
+	minNumOfRegions := math.MaxInt32 // Set enough large number for the number of regions
+	for _, num := range countRegionsByLabel {
+		minNumOfRegions = getMin(minNumOfRegions, num)
+	}
+	if minNumOfRegions >= 2 {
+		return RATE_MULTI_REGIONAL
+	}
+
+	countLocationsByLabel := make(map[string]int) // countRegionsByLabel["service_role_webapp"]: 2 (locations)
+	for ll := range locationLabels {
+		countLocationsByLabel[ll.label]++
+	}
+	minNumOfLocations := math.MaxInt32 // Set enough large number for the number of locations
+	for _, num := range countLocationsByLabel {
+		minNumOfLocations = getMin(minNumOfLocations, num)
+	}
+	if minNumOfLocations >= 2 {
+		return RATE_REGIONAL
+	}
+
+	return RATE_ZONAL
 }
 
 func scoreArchitecture(projectID string) (uint, error) {
 	log.Printf("Scoring started - ProjectID: %s\n", projectID)
-	time.Sleep(time.Second * 3) // TODO: Implement this
+	ac := NewAvailabilityChecker()
+	ac.SetProjectID(projectID)
+
+	allInfo, err := ac.GetAllResourceInfo()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get all resource info via Availability Checker: %v", err)
+	}
+
+	validAssetTypes := map[string]interface{}{
+		"compute.googleapis.com/Instance":             struct{}{},
+		"container.googleapis.com/NodePool":           struct{}{},
+		"appengine.googleapis.com/Service":            struct{}{},
+		"run.googleapis.com/Service":                  struct{}{},
+		"cloudfunctions.googleapis.com/CloudFunction": struct{}{},
+		"sqladmin.googleapis.com/Instance":            struct{}{},
+		"spanner.googleapis.com/Instance":             struct{}{},
+		"bigtableadmin.googleapis.com/Instance":       struct{}{},
+	}
+
+	invalidAssetTypes := map[string]interface{}{
+		"redis.googleapis.com/Instance": struct{}{},
+	}
+
+	if err := ac.CheckRuleViolation(allInfo, validAssetTypes, invalidAssetTypes); err != nil {
+		// Rule violation: 0 (Using invalid machine types or unlabeled resources)
+		return 0, fmt.Errorf("rule violation: %v", err)
+	}
+
+	score := ac.GetMinAvailabilityScore(allInfo, validAssetTypes)
+
 	log.Printf("Scoring finished - ProjectID: %s\n", projectID)
-	return 2, nil
+	return score, nil
 }
 
 func (w Worker) RunScoring() {
 	w.sem.Acquire(context.Background(), WEIGHT_OF_WORKER)
+	defer w.sem.Release(WEIGHT_OF_WORKER)
 
 	job := <-queue
+	defer jobInQueue.Delete(job.Userkey)
 
 	// Initialize data in user app
 	u, err := url.Parse(job.Endpoint)
 	if err != nil {
 		log.Printf("%v", err)
+		return
 	}
 	u.Path = path.Join(u.Path, "/admin/init")
 	resp, err := http.Post(u.String(), "", nil)
 	if err != nil {
 		log.Printf("%v", err)
+		return
 	}
-	resp.Body.Close() // TODO: Fix the scenario when the init path is invalid and this is called
+	resp.Body.Close()
+
+	result := JobHistory{
+		Userkey:           job.Userkey,
+		LDAP:              users[job.Userkey].LDAP,
+		ExecutedAt:        time.Now(),
+		BenchResultMsg:    "Success",
+		PlatformResultMsg: "Success",
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*BENCHMARK_TIMEOUT_SECOND)
 	defer cancel()
 	benchScore, err := benchmark(ctx, job.Endpoint)
 	if err != nil {
-		log.Printf("%v", err.Error())
+		result.BenchResultMsg = err.Error()
 	}
+	result.BenchScore = benchScore
 
-	pfScore, err := scoreArchitecture(job.ProjectID)
+	pfRate, err := scoreArchitecture(job.ProjectID)
 	if err != nil {
-		log.Printf("%v", err.Error())
+		result.PlatformResultMsg = err.Error()
 	}
+	result.PlatformRate = pfRate
 
-	result := JobHistory{
-		Userkey:    job.Userkey,
-		BenchScore: benchScore,
-		PFScore:    pfScore,
-		TotalScore: benchScore * pfScore,
-		ExecutedAt: time.Now(),
-	}
+	result.TotalScore = benchScore * pfRate
 
-	results <- result
-
-	w.sem.Release(WEIGHT_OF_WORKER)
-}
-
-func (w Worker) WriteResult() {
-	result := <-results
-	result.LDAP = users[result.Userkey].LDAP
 	// Store the result in the database server
 	if err := w.conn.Create(&result).Error; err != nil {
 		log.Printf("failed to write the result %v in database: %v", result, err)
 	}
 
-	log.Printf("Userkey: %s - BenchScore: %d, PFScore: %d\n", result.Userkey, result.BenchScore, result.PFScore)
-	jobInQueue.Delete(result.Userkey)
+	log.Printf("Userkey: %s - BenchmarkScore: %d, PlatformRate: %d\n", result.Userkey, result.BenchScore, result.PlatformRate)
 }
 
 func postBenchmark(c *gin.Context) {
@@ -521,31 +702,38 @@ func postBenchmark(c *gin.Context) {
 	}
 
 	go worker.RunScoring()
-	go worker.WriteResult()
 
 	queue <- Request{Userkey: userkey, Endpoint: endpoint, ProjectID: projectID}
-	jobInQueue.Store(userkey, struct{}{})
+	jobInQueue.Store(userkey, time.Now())
 
-	c.JSON(http.StatusAccepted, gin.H{
+	c.HTML(http.StatusAccepted, "benchmark.tmpl", gin.H{
 		"endpoint": endpoint,
 		"userkey":  userkey,
 	})
 }
 
 func timeoutPostBenchmark(c *gin.Context) {
-	c.String(http.StatusRequestTimeout, "Currently we are getting a lot of requests. Please try again later.")
+	c.HTML(http.StatusRequestTimeout, "timeout.tmpl", nil)
 }
 
 func getRequestForm(c *gin.Context) {
-	var ldaps []string
+	// Sort the users by appended date
+	type Job struct {
+		LDAP      string
+		StartedAt time.Time
+	}
+
+	var jobs []Job
 	jobInQueue.Range(func(key, value interface{}) bool {
-		ldaps = append(ldaps, users[key.(string)].LDAP)
+		jobs = append(jobs, Job{LDAP: users[key.(string)].LDAP, StartedAt: value.(time.Time)})
 		return true
 	})
 
+	sort.Slice(jobs, func(i, j int) bool { return jobs[i].StartedAt.Before(jobs[j].StartedAt) })
+
 	c.HTML(http.StatusOK, "index.tmpl", gin.H{
 		"title": "Welcome to Scoring Server",
-		"ldaps": ldaps,
+		"jobs":  jobs,
 		"dsurl": getEnvDataStudioURL(),
 	})
 }
@@ -571,6 +759,7 @@ func getEnvPort() int {
 func main() {
 	r := gin.Default()
 	r.LoadHTMLGlob("templates/*")
+	r.StaticFile("/favicon.ico", "favicon.ico")
 
 	r.GET("/", getRequestForm)
 	r.POST("/benchmark", timeout.New(
