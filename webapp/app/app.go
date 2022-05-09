@@ -18,7 +18,7 @@ func getUserID() uint {
 }
 
 func getIndexEndpoint(c *gin.Context) {
-	c.HTML(http.StatusOK, "index.tmpl", nil)
+	c.HTML(http.StatusOK, "index.html", nil)
 }
 
 func postInitEndpoint(c *gin.Context) {
@@ -38,7 +38,7 @@ func getCheckoutsEndpoint(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "checkouts.tmpl", gin.H{
+	c.HTML(http.StatusOK, "checkouts.html", gin.H{
 		"title":     "Checkouts",
 		"checkouts": checkouts,
 	})
@@ -71,7 +71,7 @@ func postCheckoutEndpoint(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusAccepted, "checkout.tmpl", gin.H{
+	c.HTML(http.StatusAccepted, "checkout.html", gin.H{
 		"title":    "Checkout",
 		"checkout": checkout,
 	})
@@ -90,7 +90,7 @@ func getProductEndpoint(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "product.tmpl", gin.H{
+	c.HTML(http.StatusOK, "product.html", gin.H{
 		"title":   "Product",
 		"product": product,
 	})
@@ -103,7 +103,7 @@ func getProductsEndpoint(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "products.tmpl", gin.H{
+	c.HTML(http.StatusOK, "products.html", gin.H{
 		"title":    "Products",
 		"products": products,
 	})
