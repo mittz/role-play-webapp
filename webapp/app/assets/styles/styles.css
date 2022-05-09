@@ -18,6 +18,7 @@ a, a:hover, a:focus, a:active {
     padding: 20px;
     background-color: #F9F9F9;
     flex: 1 0 auto;
+    margin-top: 65px;
 }
 
 .page-title {
