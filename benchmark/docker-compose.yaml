@@ -9,6 +9,8 @@ services:
     - DB_PASSWORD=score
     - DB_NAME=score
     - DS_URL=https://datastudio.google.com/s/lygI5Phd6mc
+    - GOOGLE_APPLICATION_CREDENTIALS=service-account.json
+    - GIN_MODE=release
     ports:
       - "8081:8080"
     depends_on:
