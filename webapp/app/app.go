@@ -112,6 +112,7 @@ func getProductsEndpoint(c *gin.Context) {
 func SetupRouter(dbh database.DatabaseHandler, assetsDir string, templatesDirMatch string) *gin.Engine {
 	dbHandler = dbh
 
+	// TODO: log configuration for production
 	router := gin.Default()
 	router.Static("/assets", assetsDir)
 	router.StaticFile("/favicon.ico", filepath.Join(assetsDir, "favicon.ico"))

@@ -26,7 +26,7 @@ $ make upgrade-compose
 Once you update the application codes, you need to rebuild the application and update the container image by the following command.
 
 ```shell
-$ make build # This runs "make build-app" and "make build-container".
+$ make build
 ```
 
 # Update Database Connection Config
@@ -34,7 +34,7 @@ $ make build # This runs "make build-app" and "make build-container".
 If you would like to change the configuration of the database connection like hostname and port, update the `role-play-webapp/database.json` file. Once you update the file, you need to update the container image by the following command.
 
 ```shell
-$ make build-container
+$ make build
 ```
 
 # Run web application and database separately
@@ -51,6 +51,12 @@ $ make start-app
 
 ```shell
 $ make start-db
+```
+
+# Stop web application and database services
+
+```shell
+$ make stop
 ```
 
 # Initialize Database
