@@ -37,7 +37,7 @@ const (
 	MESSAGE_INVALID_USERKEY   = "invalid userkey"
 	MESSAGE_ALREADY_INQUEUE   = "already in the queue"
 	REQUEST_TIMEOUT_SECOND    = 10
-	BENCHMARK_TIMEOUT_SECOND  = 10
+	BENCHMARK_TIMEOUT_SECOND  = 2
 	WEIGHT_OF_WORKER          = 1
 	MAX_PRODUCT_QUANTITY      = 10
 	SCORE_GET_PRODUCTS        = 5
@@ -245,43 +245,48 @@ func benchGetProducts(baseURL url.URL) uint {
 	resp, err := http.Get(getProductsURL.String())
 	if err != nil {
 		log.Printf("%v\n", err)
+		return 0
 	}
+	defer resp.Body.Close()
+
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		log.Printf("%v\n", err)
+		return 0
 	}
 
 	// Check hashsum of image
-	selection := doc.Find("tr")
-	var imagePaths []string
-	selection.Find("img").Each(func(_ int, s *goquery.Selection) {
-		if val, ok := s.Attr("src"); ok {
-			if !strings.HasPrefix(val, "http") {
-				val = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, val)
-			}
+	imagePaths := doc.Find("div.content-container").Find("img.card-img-top.products-img").Map(func(_ int, s *goquery.Selection) string {
+		val, _ := s.Attr("src")
 
-			imagePaths = append(imagePaths, val)
+		if !strings.HasPrefix(val, "http") {
+			return fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, val)
 		}
+
+		return val
 	})
 
 	productID := rand.Intn(getNumOfProducts()-1) + 1 // Exclude 0
 	if len(imagePaths) <= productID {
 		return 0
 	}
+
 	imagePath := imagePaths[productID]
 	respImage, err := http.Get(imagePath)
 	if err != nil {
 		log.Printf("%v\n", err)
+		return 0
 	}
+	defer respImage.Body.Close()
+
 	h := md5.New()
 	if _, err := io.Copy(h, respImage.Body); err != nil {
 		log.Printf("%v\n", err)
+		return 0
 	}
-	respImage.Body.Close()
 
 	// TODO: Check stylesheets
-	resp.Body.Close()
-	if err == nil && resp.StatusCode == http.StatusOK && fmt.Sprintf("%x", h.Sum(nil)) == imageHashes[path.Base(imagePath)] {
+	if resp.StatusCode == http.StatusOK && fmt.Sprintf("%x", h.Sum(nil)) == imageHashes[path.Base(imagePath)] {
 		return SCORE_GET_PRODUCTS
 	}
 
@@ -299,26 +304,39 @@ func benchPostCheckout(baseURL url.URL, productID int, productQuantity int) uint
 	if err != nil {
 		return 0
 	}
+	defer resp.Body.Close()
 
-	orderExists := false
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return 0
 	}
 
-	doc.Find("table").Each(func(_ int, tableHTML *goquery.Selection) {
-		tableHTML.Find("tr").Each(func(_ int, rowHTML *goquery.Selection) {
-			id := rowHTML.Find("td.product_id").Text()
-			quantity := rowHTML.Find("td.product_quantity").Text()
+	orderInfo := doc.Find("div.content-container").Find("p.card-text").Text()
+	imagePath, ok := doc.Find("div.content-container").Find("img.checkout-img").Attr("src")
+	if !ok {
+		return 0
+	}
 
-			if id == fmt.Sprint(productID) && quantity == fmt.Sprint(productQuantity) {
-				orderExists = true
-				return
-			}
-		})
-	})
-	resp.Body.Close()
-	if resp.StatusCode == http.StatusAccepted && orderExists { // and content is the same as expected
+	if !strings.HasPrefix(imagePath, "http") {
+		imagePath = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, imagePath)
+	}
+
+	respImage, err := http.Get(imagePath)
+	if err != nil {
+		log.Printf("%v\n", err)
+		return 0
+	}
+	defer respImage.Body.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, respImage.Body); err != nil {
+		log.Printf("%v\n", err)
+		return 0
+	}
+
+	if resp.StatusCode == http.StatusAccepted &&
+		strings.Contains(orderInfo, fmt.Sprintf("%d x", productQuantity)) &&
+		fmt.Sprintf("%x", h.Sum(nil)) == imageHashes[path.Base(imagePath)] {
 		return SCORE_POST_CHECKOUT
 	}
 
@@ -334,6 +352,7 @@ func benchGetProduct(baseURL url.URL) uint {
 		log.Printf("%v\n", err)
 		return 0
 	}
+	defer resp.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
@@ -341,30 +360,27 @@ func benchGetProduct(baseURL url.URL) uint {
 		return 0
 	}
 
-	var imagePath string
-	doc.Find("img").Each(func(_ int, s *goquery.Selection) {
-		if val, ok := s.Attr("src"); ok {
-			if !strings.HasPrefix(val, "http") {
-				val = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, val)
-			}
+	imagePath, ok := doc.Find("div.content-container").Find("img.product-img").Attr("src")
+	if !ok {
+		return 0
+	}
 
-			imagePath = val
-		}
-	})
+	if !strings.HasPrefix(imagePath, "http") {
+		imagePath = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, imagePath)
+	}
 
 	respImage, err := http.Get(imagePath)
 	if err != nil {
 		log.Printf("%v\n", err)
 		return 0
 	}
+	defer respImage.Body.Close()
+
 	h := md5.New()
 	if _, err := io.Copy(h, respImage.Body); err != nil {
 		log.Printf("%v\n", err)
 		return 0
 	}
-	respImage.Body.Close()
-
-	resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK && fmt.Sprintf("%x", h.Sum(nil)) == imageHashes[path.Base(imagePath)] {
 		return SCORE_GET_PRODUCT
@@ -380,6 +396,7 @@ func benchGetCheckouts(baseURL url.URL, productID int, productQuantity int) uint
 	if err != nil {
 		return 0
 	}
+	defer resp.Body.Close()
 
 	// Check if the order which is just created exists
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
@@ -387,21 +404,34 @@ func benchGetCheckouts(baseURL url.URL, productID int, productQuantity int) uint
 		return 0
 	}
 
-	orderExists := false
-	doc.Find("table").Each(func(_ int, tableHTML *goquery.Selection) {
-		tableHTML.Find("tr").Each(func(_ int, rowHTML *goquery.Selection) {
-			id := rowHTML.Find("td.product_id").Text()
-			quantity := rowHTML.Find("td.product_quantity").Text()
-
-			if id == fmt.Sprint(productID) && quantity == fmt.Sprint(productQuantity) {
-				orderExists = true
-				return
-			}
-		})
+	order := doc.Find("table").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		return s.Find("td.product_id").Text() != fmt.Sprint(productID) ||
+			s.Find("td.product_quantity").Text() != fmt.Sprint(productQuantity)
 	})
-	resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK && orderExists { // and content is the same as expected
+	imagePath, ok := order.Find("td.product_image").Find("img").Attr("src")
+	if !ok {
+		return 0
+	}
+
+	if !strings.HasPrefix(imagePath, "http") {
+		imagePath = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, imagePath)
+	}
+
+	respImage, err := http.Get(imagePath)
+	if err != nil {
+		log.Printf("%v\n", err)
+		return 0
+	}
+	defer respImage.Body.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, respImage.Body); err != nil {
+		log.Printf("%v\n", err)
+		return 0
+	}
+
+	if resp.StatusCode == http.StatusOK && order != nil && fmt.Sprintf("%x", h.Sum(nil)) == imageHashes[path.Base(imagePath)] {
 		return SCORE_GET_CHECKOUTS
 	}
 

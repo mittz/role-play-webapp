@@ -29,3 +29,6 @@ stop:
 upgrade-compose:
 	if [ -e $(DOCKER_COMPOSE_PATH) ]; then sudo rm -f $(DOCKER_COMPOSE_PATH); fi
 	sudo curl -L "https://github.com/docker/compose/releases/download/$(DOCKER_COMPOSE_VERSION)/docker-compose-$(shell uname -s)-$(shell uname -m)" -o ${DOCKER_COMPOSE_PATH} && sudo chmod 755 $(DOCKER_COMPOSE_PATH)
+
+delete-dangling-images:
+	docker image prune --filter "label=service_name=scstore" --filter "label=service_role=webapp"
