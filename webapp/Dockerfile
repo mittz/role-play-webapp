@@ -11,6 +11,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o $APP_NAME
 
 FROM scratch
 
+LABEL service_name="scstore"
+LABEL service_role="webapp"
+
 ENV APP_NAME=scstore
 ENV ROOT=/go/src/${APP_NAME}
 COPY . /

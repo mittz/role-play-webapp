@@ -11,6 +11,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o $APP_NAME
 
 FROM alpine:3.15.4
 
+LABEL service_name="score"
+LABEL service_role="webapp"
+
 ENV APP_NAME=score
 ENV ROOT=/go/src/${APP_NAME}
 COPY . /

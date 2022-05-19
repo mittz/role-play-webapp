@@ -46,10 +46,10 @@
                 <tbody>
                     {{ range .checkouts }}
                     <tr>
-                        <td>{{ .Product.Name }}</td>
-                        <td> <img class="table-img" alt="" src="{{ .Product.Image }}"> </td>
-                        <td>{{ .ProductQuantity }}</td>
-                        <td>{{ .CreatedAt }}</td>
+                        <td class="product_name">{{ .Product.Name }}</td>
+                        <td class="product_image"> <img class="table-img" alt="" src="{{ .Product.Image }}"> </td>
+                        <td class="product_quantity">{{ .ProductQuantity }}</td>
+                        <td class="product_createdat">{{ .CreatedAt }}</td>
                     </tr>
                     {{ end }}
                 </tbody>
