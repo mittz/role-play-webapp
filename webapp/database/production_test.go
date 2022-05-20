@@ -1,9 +1,6 @@
 package database
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"regexp"
 	"testing"
 
@@ -28,7 +25,7 @@ func NewMockDatabaseHandler() (DatabaseHandler, sqlmock.Sqlmock, error) {
 		return nil, nil, err
 	}
 
-	dbh.DB.Conn = gdbconn
+	dbh.Conn = gdbconn
 
 	return dbh, mock, nil
 }
@@ -36,39 +33,6 @@ func NewMockDatabaseHandler() (DatabaseHandler, sqlmock.Sqlmock, error) {
 func TestNewProdDatabaseHandler(t *testing.T) {
 	dbh := NewProdDatabaseHandler()
 	assert.NotNil(t, dbh)
-}
-
-func TestReadProperties(t *testing.T) {
-	dirname, err := ioutil.TempDir("", "scstore-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dirname)
-
-	jsonFile, err := ioutil.TempFile(dirname, "*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	b, err := json.Marshal(&Database{
-		Host:     "localhost",
-		Port:     5432,
-		User:     "postgres",
-		Password: "postgres",
-		DBName:   "postgres"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := jsonFile.WriteString(string(b)); err != nil {
-		t.Fatal(err)
-	}
-
-	dbh := NewProdDatabaseHandler()
-	err = dbh.ReadProperties(jsonFile.Name())
-
-	assert.Nil(t, err)
-	assert.Equal(t, "localhost", dbh.DB.Host)
 }
 
 func TestOpenDatabase(t *testing.T) {

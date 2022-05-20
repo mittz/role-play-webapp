@@ -12,12 +12,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := dbHandler.ReadProperties("database.json"); err != nil {
-		log.Fatal(err)
-	}
+
 	if err := dbHandler.OpenDatabase(); err != nil {
 		log.Fatal(err)
 	}
+
 	if err := dbHandler.InitDatabase(); err != nil {
 		log.Fatal(err)
 	}

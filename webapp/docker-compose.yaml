@@ -3,6 +3,11 @@ services:
   scstore-app:
     image: scstore:1.0.0
     environment:
+      - DB_HOSTNAME=scstore-database
+      - DB_PORT=5432
+      - DB_USERNAME=scstore
+      - DB_PASSWORD=scstore
+      - DB_NAME=scstore
       - GIN_MODE=release
     ports:
       - "8080:8080"

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Welcome | Scoring Server</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+</head>
+<body>
+  <div class="container">
+    <h4>Welcome to Scoring Server</h4>
+    <p>Scoring Server assesses qualities of your web application service based on performance and availability.</p>
+  </div>
+  <div class="container">
+    <h4>Waiting Queue</h4>
+    <div class="alert alert-primary" role="alert">
+      Running and waiting requests are listed in the following queue.
+    </div>
+    <div class="p-3 mb-2 bg-light text-dark">
+      {{ range .jobs }}
+        <span class="badge bg-info text-dark">{{ .LDAP }}</span>
+      {{ end }}
+    </div>
+  </div>
+  <br>
+  <div class="container">
+    <h4>Request Form</h4>
+    <p>You can't submit a new request while your request is running. If you would like to create a new request, you need to wait for your running job to end.</p>
+    <div class="alert alert-warning" role="alert">
+      Once your request job starts, the data in your database is initialized.
+    </div>
+    <div class="form-group">
+      <label for="input_userkey">Userkey</label>
+      <input type="text" name="userkey" class="form-control" id="input_userkey" placeholder="Userkey" required>
+      <small id="userkeyHelp" class="form-text text-muted">Userkey is used to validate your request.</small>
+    </div>
+    <div class="form-group">
+      <label for="input_endpoint">Endpoint</label>
+      <input type="url" name="endpoint" class="form-control" id="input_endpoint" placeholder="http://xxx.xxx.xxx.xxx" required>
+      <small id="endpointHelp" class="form-text text-muted">Endpoint is used to benchmark your web application.</small>
+    </div>
+    <div class="form-group">
+      <label for="input_projectid">ProjectID</label>
+      <input type="text" name="project_id" class="form-control" id="input_projectid" placeholder="ProjectID" required>
+      <small id="projectidHelp" class="form-text text-muted">ProjectID is used to rate service availability of your project resources.</small>
+    </div>
+    <button type="submit" class="btn btn-primary">Submit</button>
+  </div>
+  <br>
+  <div class="container">
+    <h4>Results Dashboard</h4>
+    <p>You can see your results in the Data Studio dashboard. Results of other participants also can be seen in the dashboard.</p>
+    <a class="btn btn-primary" href="{{ .dsurl }}" role="button">Go to Data Studio</a>
+  </div>
+</body>
+</html>
