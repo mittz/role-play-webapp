@@ -2,12 +2,14 @@ package database
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"strconv"
 
 	"gorm.io/gorm"
 )
 
 type DatabaseHandler interface {
-	ReadProperties(filename string) error
 	OpenDatabase() error
 	InitDatabase() error
 	GetProduct(id uint) (Product, error)
@@ -20,12 +22,7 @@ type DatabaseHandler interface {
 const InitDataJSONFileName = "initdata.json"
 
 type Database struct {
-	Host     string `json:"host"`
-	Port     uint   `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	DBName   string `json:"dbname"`
-	Conn     *gorm.DB
+	Conn *gorm.DB
 }
 
 type Product struct {
@@ -64,4 +61,38 @@ func NewDatabaseHandler(environment string) (DatabaseHandler, error) {
 	default:
 		return nil, fmt.Errorf("environment: %s is not supported", environment)
 	}
+}
+
+func getEnvDBHostname() string {
+	return getEnv("DB_HOSTNAME", "scstore-database")
+}
+
+func getEnvDBPort() int {
+	val := getEnv("DB_PORT", "5432")
+	port, err := strconv.Atoi(val)
+	if err != nil {
+		log.Fatalf("DB_PORT should be integer, but %s: %v", val, err)
+	}
+
+	return port
+}
+
+func getEnvDBUsername() string {
+	return getEnv("DB_USERNAME", "scstore")
+}
+
+func getEnvDBPassword() string {
+	return getEnv("DB_PASSWORD", "scstore")
+}
+
+func getEnvDBName() string {
+	return getEnv("DB_NAME", "scstore")
+}
+
+func getEnv(key, defaultVal string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+
+	return defaultVal
 }

@@ -10,10 +10,6 @@ func NewDevDatabaseHandler() DevDatabaseHandler {
 	return DevDatabaseHandler{DB: &Database{}}
 }
 
-func (dbh DevDatabaseHandler) ReadProperties(filename string) error {
-	return nil
-}
-
 func (dbh DevDatabaseHandler) OpenDatabase() error {
 	return nil
 }

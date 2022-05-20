@@ -736,14 +736,14 @@ func postBenchmark(c *gin.Context) {
 	queue <- Request{Userkey: userkey, Endpoint: endpoint, ProjectID: projectID}
 	jobInQueue.Store(userkey, time.Now())
 
-	c.HTML(http.StatusAccepted, "benchmark.tmpl", gin.H{
+	c.HTML(http.StatusAccepted, "benchmark.html", gin.H{
 		"endpoint": endpoint,
 		"userkey":  userkey,
 	})
 }
 
 func timeoutPostBenchmark(c *gin.Context) {
-	c.HTML(http.StatusRequestTimeout, "timeout.tmpl", nil)
+	c.HTML(http.StatusRequestTimeout, "timeout.html", nil)
 }
 
 func getRequestForm(c *gin.Context) {
@@ -761,8 +761,7 @@ func getRequestForm(c *gin.Context) {
 
 	sort.Slice(jobs, func(i, j int) bool { return jobs[i].StartedAt.Before(jobs[j].StartedAt) })
 
-	c.HTML(http.StatusOK, "index.tmpl", gin.H{
-		"title": "Welcome to Scoring Server",
+	c.HTML(http.StatusOK, "index.html", gin.H{
 		"jobs":  jobs,
 		"dsurl": getEnvDataStudioURL(),
 	})
