@@ -28,22 +28,24 @@
     <div class="alert alert-warning" role="alert">
       Once your request job starts, the data in your database is initialized.
     </div>
-    <div class="form-group">
-      <label for="input_userkey">Userkey</label>
-      <input type="text" name="userkey" class="form-control" id="input_userkey" placeholder="Userkey" required>
-      <small id="userkeyHelp" class="form-text text-muted">Userkey is used to validate your request.</small>
-    </div>
-    <div class="form-group">
-      <label for="input_endpoint">Endpoint</label>
-      <input type="url" name="endpoint" class="form-control" id="input_endpoint" placeholder="http://xxx.xxx.xxx.xxx" required>
-      <small id="endpointHelp" class="form-text text-muted">Endpoint is used to benchmark your web application.</small>
-    </div>
-    <div class="form-group">
-      <label for="input_projectid">ProjectID</label>
-      <input type="text" name="project_id" class="form-control" id="input_projectid" placeholder="ProjectID" required>
-      <small id="projectidHelp" class="form-text text-muted">ProjectID is used to rate service availability of your project resources.</small>
-    </div>
-    <button type="submit" class="btn btn-primary">Submit</button>
+    <form action="/benchmark" method="POST">
+      <div class="form-group">
+        <label for="input_userkey">Userkey</label>
+        <input type="text" name="userkey" class="form-control" id="input_userkey" placeholder="Userkey" required>
+        <small id="userkeyHelp" class="form-text text-muted">Userkey is used to validate your request.</small>
+      </div>
+      <div class="form-group">
+        <label for="input_endpoint">Endpoint</label>
+        <input type="url" name="endpoint" class="form-control" id="input_endpoint" placeholder="http://xxx.xxx.xxx.xxx" required>
+        <small id="endpointHelp" class="form-text text-muted">Endpoint is used to benchmark your web application.</small>
+      </div>
+      <div class="form-group">
+        <label for="input_projectid">ProjectID</label>
+        <input type="text" name="project_id" class="form-control" id="input_projectid" placeholder="ProjectID" required>
+        <small id="projectidHelp" class="form-text text-muted">ProjectID is used to rate service availability of your project resources.</small>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
   </div>
   <br>
   <div class="container">
