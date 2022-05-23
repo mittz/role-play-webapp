@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/mittz/role-play-webapp/webapp/database"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert" // TODO: Replace this with gopkg.in/check.v1
 )
 
 var dbDevHandler database.DatabaseHandler
