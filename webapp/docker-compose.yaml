@@ -10,7 +10,7 @@ services:
       - DB_NAME=scstore
       - GIN_MODE=release
     ports:
-      - "8080:8080"
+      - "80:8080"
     depends_on:
       scstore-database:
         condition: service_healthy
@@ -21,6 +21,8 @@ services:
       - POSTGRES_USER=scstore
       - POSTGRES_PASSWORD=scstore
       - POSTGRES_DB=scstore
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s

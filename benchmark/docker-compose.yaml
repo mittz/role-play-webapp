@@ -12,7 +12,7 @@ services:
     - GOOGLE_APPLICATION_CREDENTIALS=service-account.json
     - GIN_MODE=release
     ports:
-      - "8081:8080"
+      - "80:8080"
     depends_on:
       score-database:
         condition: service_healthy

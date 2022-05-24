@@ -11,8 +11,6 @@ import (
 )
 
 func NewMockDatabaseHandler() (DatabaseHandler, sqlmock.Sqlmock, error) {
-	dbh := NewProdDatabaseHandler()
-
 	mockDB, mock, err := sqlmock.New()
 	if err != nil {
 		return nil, nil, err
@@ -25,13 +23,19 @@ func NewMockDatabaseHandler() (DatabaseHandler, sqlmock.Sqlmock, error) {
 		return nil, nil, err
 	}
 
-	dbh.Conn = gdbconn
+	dbh := NewProdDatabaseHandler(gdbconn)
 
 	return dbh, mock, nil
 }
 
 func TestNewProdDatabaseHandler(t *testing.T) {
-	dbh := NewProdDatabaseHandler()
+	mockDB, _, err := sqlmock.New()
+	gdbconn, err := gorm.Open(postgres.New(postgres.Config{
+		Conn: mockDB,
+	}), &gorm.Config{})
+	assert.Nil(t, err)
+
+	dbh := NewProdDatabaseHandler(gdbconn)
 	assert.NotNil(t, dbh)
 }
 

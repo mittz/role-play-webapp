@@ -83,10 +83,16 @@ func TestPostCheckoutEndpoint(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	dbHandler, err := database.NewDatabaseHandler("development")
+	conn, err := database.InitializeDevDBConn()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	dbHandler, err := database.NewDatabaseHandler("development", conn)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	dbDevHandler = dbHandler
 
 	os.Exit(m.Run())

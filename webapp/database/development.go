@@ -3,15 +3,11 @@ package database
 import "gorm.io/gorm"
 
 type DevDatabaseHandler struct {
-	DB *Database
+	Conn *gorm.DB
 }
 
-func NewDevDatabaseHandler() DevDatabaseHandler {
-	return DevDatabaseHandler{DB: &Database{}}
-}
-
-func (dbh DevDatabaseHandler) OpenDatabase() error {
-	return nil
+func NewDevDatabaseHandler(c *gorm.DB) DevDatabaseHandler {
+	return DevDatabaseHandler{Conn: c}
 }
 
 func (dbh DevDatabaseHandler) InitDatabase() error {

@@ -6,11 +6,12 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 type DatabaseHandler interface {
-	OpenDatabase() error
 	InitDatabase() error
 	GetProduct(id uint) (Product, error)
 	GetProducts() ([]Product, error)
@@ -52,15 +53,38 @@ type Blob struct {
 	Users    []User    `json:"users"`
 }
 
-func NewDatabaseHandler(environment string) (DatabaseHandler, error) {
+func NewDatabaseHandler(environment string, conn *gorm.DB) (DatabaseHandler, error) {
 	switch environment {
 	case "production":
-		return NewProdDatabaseHandler(), nil
+		return NewProdDatabaseHandler(conn), nil
 	case "development":
-		return NewDevDatabaseHandler(), nil
+		return NewDevDatabaseHandler(conn), nil
 	default:
 		return nil, fmt.Errorf("environment: %s is not supported", environment)
 	}
+}
+
+func InitializeProdDBConn() (*gorm.DB, error) {
+	dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s",
+		getEnvDBHostname(),
+		getEnvDBPort(),
+		getEnvDBUsername(),
+		getEnvDBName(),
+		getEnvDBPassword(),
+	)
+
+	return gorm.Open(postgres.Open(dsn), &gorm.Config{})
+}
+
+func InitializeDevDBConn() (*gorm.DB, error) {
+	mockDB, _, err := sqlmock.New()
+	if err != nil {
+		return nil, err
+	}
+
+	return gorm.Open(postgres.New(postgres.Config{
+		Conn: mockDB,
+	}), &gorm.Config{})
 }
 
 func getEnvDBHostname() string {
