@@ -8,21 +8,18 @@ import (
 )
 
 func main() {
-	dbHandler, err := database.NewDatabaseHandler("production")
+	dbConn, err := database.InitializeProdDBConn()
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+
+	dbHandler, err := database.NewDatabaseHandler("production", dbConn)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// TODO: Consider making OpeDatabase called in each http handler
-	// because this causes a deployment error when a database is not ready
-	if err := dbHandler.OpenDatabase(); err != nil {
-		log.Fatal(err)
-	}
-
-	// TODO: Delete InitDatabase here
-	// because this causes a deployment error when a database is not ready
 	if err := dbHandler.InitDatabase(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to init database: %v", err)
 	}
 
 	const assetsDir = "./app/assets"

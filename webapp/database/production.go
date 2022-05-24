@@ -2,11 +2,9 @@ package database
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -14,26 +12,8 @@ type ProdDatabaseHandler struct {
 	Conn *gorm.DB
 }
 
-func NewProdDatabaseHandler() ProdDatabaseHandler {
-	return ProdDatabaseHandler{}
-}
-
-func (dbh ProdDatabaseHandler) OpenDatabase() error {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s",
-		getEnvDBHostname(),
-		getEnvDBPort(),
-		getEnvDBUsername(),
-		getEnvDBName(),
-		getEnvDBPassword(),
-	)
-
-	conn, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return err
-	}
-	dbh.Conn = conn
-
-	return nil
+func NewProdDatabaseHandler(conn *gorm.DB) ProdDatabaseHandler {
+	return ProdDatabaseHandler{Conn: conn}
 }
 
 func (dbh ProdDatabaseHandler) InitDatabase() error {

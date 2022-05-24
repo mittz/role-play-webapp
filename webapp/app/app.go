@@ -18,7 +18,7 @@ func getUserID() uint {
 }
 
 func getIndexEndpoint(c *gin.Context) {
-	c.HTML(http.StatusOK, "index.html", nil)
+	c.Redirect(http.StatusPermanentRedirect, "/products")
 }
 
 func postInitEndpoint(c *gin.Context) {
