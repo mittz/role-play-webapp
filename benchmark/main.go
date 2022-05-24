@@ -43,9 +43,9 @@ const (
 	MESSAGE_INVALID_USERKEY   = "invalid userkey"
 	MESSAGE_ALREADY_INQUEUE   = "already in the queue"
 	REQUEST_TIMEOUT_SECOND    = 10
-	BENCHMARK_TIMEOUT_SECOND  = 2
+	BENCHMARK_TIMEOUT_SECOND  = 180
 	WEIGHT_OF_WORKER          = 1
-	MAX_PRODUCT_QUANTITY      = 10
+	MAX_PRODUCT_QUANTITY      = 100
 	SCORE_GET_PRODUCTS        = 5
 	SCORE_POST_CHECKOUT       = 2
 	SCORE_GET_PRODUCT         = 1
@@ -496,44 +496,6 @@ func (ac *AvailabilityChecker) SetProjectID(projectID string) {
 	ac.projectID = projectID
 }
 
-func (ac *AvailabilityChecker) GetAllResourceInfo() ([]ResourceInfo, error) {
-	// $ gcloud asset search-all-resources \
-	// --scope projects/[PROJECT_ID] \
-	scope := fmt.Sprintf("projects/%s", ac.projectID)
-	ctx := context.Background()
-	client, err := asset.NewClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer client.Close()
-
-	req := &assetpb.SearchAllResourcesRequest{
-		Scope: scope,
-	}
-
-	it := client.SearchAllResources(ctx, req)
-	var resources []ResourceInfo
-	for {
-		resource, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		ri := ResourceInfo{
-			assetType:            resource.AssetType,
-			location:             resource.Location,
-			labels:               resource.Labels,
-			additionalAttributes: resource.AdditionalAttributes.AsMap(),
-		}
-		resources = append(resources, ri)
-	}
-
-	return resources, nil
-}
-
 func (ac *AvailabilityChecker) CheckRuleViolation(resourceInfo []ResourceInfo,
 	validAssetTypes map[string]interface{}, invalidAssetTypes map[string]interface{}) error {
 	// TODO: Check if the resources are not exceeded the limits
@@ -615,42 +577,6 @@ func (ac *AvailabilityChecker) GetMinAvailabilityScore(info []ResourceInfo, asse
 	}
 
 	return RATE_ZONAL
-}
-
-func scoreArchitecture(projectID string) (uint, error) {
-	log.Printf("Scoring started - ProjectID: %s\n", projectID)
-	ac := NewAvailabilityChecker()
-	ac.SetProjectID(projectID)
-
-	allInfo, err := ac.GetAllResourceInfo()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get all resource info via Availability Checker: %v", err)
-	}
-
-	validAssetTypes := map[string]interface{}{
-		"compute.googleapis.com/Instance":             struct{}{},
-		"container.googleapis.com/NodePool":           struct{}{},
-		"appengine.googleapis.com/Service":            struct{}{},
-		"run.googleapis.com/Service":                  struct{}{},
-		"cloudfunctions.googleapis.com/CloudFunction": struct{}{},
-		"sqladmin.googleapis.com/Instance":            struct{}{},
-		"spanner.googleapis.com/Instance":             struct{}{},
-		"bigtableadmin.googleapis.com/Instance":       struct{}{},
-	}
-
-	invalidAssetTypes := map[string]interface{}{
-		"redis.googleapis.com/Instance": struct{}{},
-	}
-
-	if err := ac.CheckRuleViolation(allInfo, validAssetTypes, invalidAssetTypes); err != nil {
-		// Rule violation: 0 (Using invalid machine types or unlabeled resources)
-		return 0, fmt.Errorf("rule violation: %v", err)
-	}
-
-	score := ac.GetMinAvailabilityScore(allInfo, validAssetTypes)
-
-	log.Printf("Scoring finished - ProjectID: %s\n", projectID)
-	return score, nil
 }
 
 func rateArchitecture(projectID string, labels map[string]string) (int, error) {
@@ -1081,7 +1007,6 @@ func (w Worker) RunScoring() {
 
 	pfRate, err := rateArchitecture(job.ProjectID, labels)
 
-	// pfRate, err := scoreArchitecture(job.ProjectID)
 	if err != nil {
 		result.PlatformResultMsg = err.Error()
 	}
@@ -1165,6 +1090,10 @@ func getEnv(key, defaultVal string) string {
 	}
 
 	return defaultVal
+}
+
+func getEnvSAKey() string {
+	return getEnv("GOOGLE_APPLICATION_CREDENTIALS", "")
 }
 
 func getEnvPort() int {
