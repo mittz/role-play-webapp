@@ -17,7 +17,7 @@ services:
       score-database:
         condition: service_healthy
   score-database:
-    image: postgres:14.2
+    image: postgres:12.10-alpine3.15
     container_name: "score-database"
     volumes:
       - ./volume/score-database/var/lib/postgresql/data:/var/lib/postgresql/data
@@ -25,6 +25,8 @@ services:
       - POSTGRES_USER=score
       - POSTGRES_PASSWORD=score
       - POSTGRES_DB=score
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
