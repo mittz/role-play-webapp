@@ -1,5 +1,8 @@
 FROM golang:1.18.1-alpine3.15 as builder
 
+LABEL service_name="score"
+LABEL service_role="webapp"
+
 ENV APP_NAME=score
 ENV ROOT=/go/src/${APP_NAME}
 WORKDIR ${ROOT}

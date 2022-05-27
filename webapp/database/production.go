@@ -70,6 +70,7 @@ func (dbh ProdDatabaseHandler) GetProducts() ([]Product, error) {
 func (dbh ProdDatabaseHandler) GetCheckouts(userID uint) ([]Checkout, error) {
 	var checkouts []Checkout
 
+	// TODO: Consider if index handling is required
 	err := dbh.Conn.Joins("User").Joins("Product").Find(&checkouts).Where("users.id =?", userID).Error
 
 	return checkouts, err
