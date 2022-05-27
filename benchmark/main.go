@@ -43,13 +43,14 @@ const (
 	MESSAGE_INVALID_USERKEY   = "invalid userkey"
 	MESSAGE_ALREADY_INQUEUE   = "already in the queue"
 	REQUEST_TIMEOUT_SECOND    = 10
-	BENCHMARK_TIMEOUT_SECOND  = 180
+	BENCHMARK_TIMEOUT_SECOND  = 60
 	WEIGHT_OF_WORKER          = 1
 	MAX_PRODUCT_QUANTITY      = 100
 	SCORE_GET_PRODUCTS        = 5
 	SCORE_POST_CHECKOUT       = 2
 	SCORE_GET_PRODUCT         = 1
 	SCORE_GET_CHECKOUTS       = 4
+	PROJECT_BUDGET_MRR_USD    = 1000
 )
 
 const (
@@ -439,12 +440,12 @@ func benchGetCheckouts(baseURL url.URL, productID int, productQuantity int) uint
 	return 0
 }
 
-func benchmark(ctx context.Context, endpoint string) (uint, error) {
-	score := uint(0)
+func benchmark(ctx context.Context, endpoint string, score chan<- uint) {
+	total := uint(0)
 	for {
 		select {
 		case <-ctx.Done():
-			return score, nil
+			score <- total
 		default: // do benchmark
 			rand.Seed(time.Now().UnixNano())
 			baseURL, err := url.Parse(endpoint)
@@ -455,13 +456,14 @@ func benchmark(ctx context.Context, endpoint string) (uint, error) {
 			productID := rand.Intn(getNumOfProducts()-1) + 1         // Exclude 0
 			productQuantity := rand.Intn(MAX_PRODUCT_QUANTITY-1) + 1 // Exclude 0
 
-			score += benchGetProducts(*baseURL)
-			score += benchPostCheckout(*baseURL, productID, productQuantity)
-			score += benchGetProduct(*baseURL)
-			score += benchGetCheckouts(*baseURL, productID, productQuantity)
+			total += benchGetProducts(*baseURL)
+			total += benchPostCheckout(*baseURL, productID, productQuantity)
+			total += benchGetProduct(*baseURL)
+			total += benchGetCheckouts(*baseURL, productID, productQuantity)
 
-			if score == 0 {
-				return score, fmt.Errorf("unable to receive expected results from the endpoint (%s)", endpoint)
+			if total == 0 {
+				score <- total
+				return
 			}
 		}
 	}
@@ -963,12 +965,36 @@ func (ac *AvailabilityChecker) RateCloudSpanner(labelKey string, labelVal string
 // 	return 0, nil
 // }
 
+func calcProjectCost(projectID string) float64 {
+	return 1000
+}
+
 func (w Worker) RunScoring() {
 	w.sem.Acquire(context.Background(), WEIGHT_OF_WORKER)
 	defer w.sem.Release(WEIGHT_OF_WORKER)
 
 	job := <-queue
 	defer jobInQueue.Delete(job.Userkey)
+
+	// Cost check
+	if calcProjectCost(job.ProjectID) <= PROJECT_BUDGET_MRR_USD {
+		r := JobHistory{
+			Userkey:           job.Userkey,
+			LDAP:              users[job.Userkey].LDAP,
+			ExecutedAt:        time.Now(),
+			BenchResultMsg:    fmt.Sprintf("Not executed: The project cost is beyond the threshold $%d MRR", PROJECT_BUDGET_MRR_USD),
+			PlatformResultMsg: fmt.Sprintf("Not executed: The project cost is beyond the threshold $%d MRR", PROJECT_BUDGET_MRR_USD),
+			BenchScore:        0,
+			PlatformRate:      0,
+			TotalScore:        0,
+		}
+		// Store the result in the database server
+		if err := w.conn.Create(&r).Error; err != nil {
+			log.Printf("failed to write the result %v in database: %v", r, err)
+		}
+
+		return
+	}
 
 	// Initialize data in user app
 	u, err := url.Parse(job.Endpoint)
@@ -994,10 +1020,18 @@ func (w Worker) RunScoring() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*BENCHMARK_TIMEOUT_SECOND)
 	defer cancel()
-	benchScore, err := benchmark(ctx, job.Endpoint)
-	if err != nil {
-		result.BenchResultMsg = err.Error()
+	score := make(chan uint)
+	numOfBenchmarkWorkers := 4
+	for i := 0; i < numOfBenchmarkWorkers; i++ {
+		// TODO: Error handling when one of the benchmark functions faced an issue
+		go benchmark(ctx, job.Endpoint, score)
 	}
+
+	benchScore := uint(0)
+	for i := 0; i < numOfBenchmarkWorkers; i++ {
+		benchScore += <-score
+	}
+
 	result.BenchScore = benchScore
 
 	labels := map[string]string{
