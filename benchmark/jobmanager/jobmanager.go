@@ -13,18 +13,6 @@ var (
 	jobsMap       sync.Map
 )
 
-type JobHistory struct {
-	ID                uint `gorm:"primary_key"`
-	Userkey           string
-	LDAP              string
-	BenchScore        uint
-	BenchResultMsg    string
-	PlatformRate      uint
-	PlatformResultMsg string
-	TotalScore        uint
-	ExecutedAt        time.Time
-}
-
 // TODO: Consider if we can replace Job with JobRequest
 type Job struct {
 	LDAP      string
