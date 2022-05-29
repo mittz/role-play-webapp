@@ -31,7 +31,11 @@ func (b *BenchmarkTestSuite) TestRateComputeEngine(c *C) {
 	rate, err := ac.RateComputeEngine("service_role_webapp", "true")
 
 	c.Check(err, IsNil)
-	c.Check(rate, Equals, RATE_NO_RESOURCE)
+	c.Check(rate, Equals, RATE_ZONAL)
+
+	rate, err = ac.RateComputeEngine("service_role_db", "true")
+	c.Check(err, IsNil)
+	c.Check(rate, Equals, RATE_ZONAL)
 }
 
 func (b *BenchmarkTestSuite) TestRateAppEngine(c *C) {
@@ -41,7 +45,7 @@ func (b *BenchmarkTestSuite) TestRateAppEngine(c *C) {
 	rate, err := ac.RateAppEngine("service_role_webapp", "true")
 
 	c.Check(err, IsNil)
-	c.Check(rate, Equals, RATE_REGIONAL)
+	c.Check(rate, Equals, RATE_NO_RESOURCE)
 }
 
 func (b *BenchmarkTestSuite) TestRateCloudRun(c *C) {
@@ -51,7 +55,7 @@ func (b *BenchmarkTestSuite) TestRateCloudRun(c *C) {
 	rate, err := ac.RateCloudRun("service_role_webapp", "true")
 
 	c.Check(err, IsNil)
-	c.Check(rate, Equals, RATE_REGIONAL)
+	c.Check(rate, Equals, RATE_NO_RESOURCE)
 }
 
 func (b *BenchmarkTestSuite) TestRateCloudFunctions(c *C) {
@@ -61,7 +65,7 @@ func (b *BenchmarkTestSuite) TestRateCloudFunctions(c *C) {
 	rate, err := ac.RateCloudFunctions("service_role_webapp", "true")
 
 	c.Check(err, IsNil)
-	c.Check(rate, Equals, RATE_REGIONAL)
+	c.Check(rate, Equals, RATE_NO_RESOURCE)
 }
 
 func (b *BenchmarkTestSuite) TestRateCloudSQL(c *C) {
@@ -72,7 +76,7 @@ func (b *BenchmarkTestSuite) TestRateCloudSQL(c *C) {
 	rate, err := ac.RateCloudSQL("service_role_db", "true")
 
 	c.Check(err, IsNil)
-	c.Check(rate, Equals, RATE_REGIONAL)
+	c.Check(rate, Equals, RATE_NO_RESOURCE)
 }
 
 func (b *BenchmarkTestSuite) TestRateCloudSpanner(c *C) {
@@ -83,7 +87,7 @@ func (b *BenchmarkTestSuite) TestRateCloudSpanner(c *C) {
 	rate, err := ac.RateCloudSpanner("service_role_db", "true")
 
 	c.Check(err, IsNil)
-	c.Check(rate, Equals, RATE_MULTI_REGIONAL)
+	c.Check(rate, Equals, RATE_NO_RESOURCE)
 }
 
 func (b *BenchmarkTestSuite) TestRateAvaiability(c *C) {
@@ -115,5 +119,5 @@ func (b *BenchmarkTestSuite) TestRateArchitecture(c *C) {
 	pfRate, err := RateArchitecture(projectID, labels)
 
 	c.Check(err, IsNil)
-	c.Check(pfRate, Equals, RATE_ZONAL)
+	c.Check(pfRate, Equals, RATE_NO_RESOURCE)
 }
