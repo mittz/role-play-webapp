@@ -32,6 +32,25 @@ type ScoreManager struct {
 	sem *semaphore.Weighted
 }
 
+type JobHistory struct {
+	ID                uint `gorm:"primary_key"`
+	Userkey           string
+	LDAP              string
+	BenchScore        uint
+	BenchResultMsg    string
+	PlatformRate      uint
+	PlatformResultMsg string
+	TotalScore        uint
+	ExecutedAt        time.Time
+}
+
+type Ranking struct {
+	ID         uint `gorm:"primary_key"`
+	LDAP       string
+	Score      uint
+	ExecutedAt time.Time
+}
+
 func NewScoreManager() ScoreManager {
 	return ScoreManager{db: initDBConn(), sem: semaphore.NewWeighted(int64(getLimitNumOfManagers()))}
 }
@@ -57,9 +76,10 @@ func (w ScoreManager) Run() {
 	}
 	resp.Body.Close()
 
-	result := jobmanager.JobHistory{
+	ldap := usermanager.GetLDAPByUserkey(job.Userkey)
+	result := JobHistory{
 		Userkey:           job.Userkey,
-		LDAP:              usermanager.GetLDAPByUserkey(job.Userkey),
+		LDAP:              ldap,
 		ExecutedAt:        time.Now(),
 		BenchResultMsg:    "Success",
 		PlatformResultMsg: "Success",
@@ -99,6 +119,34 @@ func (w ScoreManager) Run() {
 		log.Printf("failed to write the result %v in database: %v", result, err)
 	}
 
+	// Update the ranking table
+	// Check if the user is present in the ranking table
+	// If no, add the user info (ldap), executed_at and result (score) in the ranking table
+	// If yes, update the ranking table with the user info, executed_at and result if needed
+	var ranking Ranking
+	if err := w.db.First(&ranking, "ldap =?", ldap).Error; err != nil {
+		log.Printf("failed to read a result of ldap: %s from database", ldap)
+	}
+
+	if ranking.LDAP == "" {
+		ranking = Ranking{
+			LDAP:       ldap,
+			Score:      result.TotalScore,
+			ExecutedAt: result.ExecutedAt,
+		}
+		if err := w.db.Create(&ranking).Error; err != nil {
+			log.Printf("failed to write the ranking %v in database: %v", ranking, err)
+		}
+	} else {
+		if ranking.Score < result.TotalScore {
+			ranking.Score = result.TotalScore
+			ranking.ExecutedAt = result.ExecutedAt
+			if err := w.db.Save(&ranking).Error; err != nil {
+				log.Printf("failed to update the ranking %v in database: %v", ranking, err)
+			}
+		}
+	}
+
 	log.Printf("Userkey: %s - BenchmarkScore: %d, PlatformRate: %d\n", result.Userkey, result.BenchScore, result.PlatformRate)
 }
 
@@ -116,8 +164,14 @@ func initDBConn() *gorm.DB {
 		log.Panicf("Failed to open database connection: %v", err)
 	}
 
-	if !conn.Migrator().HasTable(&jobmanager.JobHistory{}) {
-		if err := conn.Migrator().CreateTable(&jobmanager.JobHistory{}); err != nil {
+	if !conn.Migrator().HasTable(&JobHistory{}) {
+		if err := conn.Migrator().CreateTable(&JobHistory{}); err != nil {
+			log.Panicf("Failed to create table: %v", err)
+		}
+	}
+
+	if !conn.Migrator().HasTable(&Ranking{}) {
+		if err := conn.Migrator().CreateTable(&Ranking{}); err != nil {
 			log.Panicf("Failed to create table: %v", err)
 		}
 	}
