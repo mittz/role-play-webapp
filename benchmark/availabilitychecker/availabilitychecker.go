@@ -190,7 +190,7 @@ func (ac *AvailabilityChecker) RateAppEngine(labelKey string, labelVal string) (
 		}
 	}
 
-	if isServed == isLabelled {
+	if isServed && isLabelled {
 		return RATE_REGIONAL, nil
 	}
 
