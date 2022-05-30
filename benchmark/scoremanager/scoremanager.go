@@ -138,12 +138,10 @@ func (w ScoreManager) Run() {
 			log.Printf("failed to write the ranking %v in database: %v", ranking, err)
 		}
 	} else {
-		if ranking.Score < result.TotalScore {
-			ranking.Score = result.TotalScore
-			ranking.ExecutedAt = result.ExecutedAt
-			if err := w.db.Save(&ranking).Error; err != nil {
-				log.Printf("failed to update the ranking %v in database: %v", ranking, err)
-			}
+		ranking.Score = result.TotalScore
+		ranking.ExecutedAt = result.ExecutedAt
+		if err := w.db.Save(&ranking).Error; err != nil {
+			log.Printf("failed to update the ranking %v in database: %v", ranking, err)
 		}
 	}
 
