@@ -53,15 +53,33 @@ func (b Benchmarker) Benchmark(ctx context.Context, endpoint string, score chan<
 			productID := rand.Intn(productmanager.GetNumOfProducts()-1) + 1       // Exclude 0
 			productQuantity := rand.Intn(MAX_PRODUCT_QUANTITY_PER_CHECKOUT-1) + 1 // Exclude 0
 
-			total += benchGetProducts(*baseURL)
-			total += benchPostCheckout(*baseURL, productID, productQuantity)
-			total += benchGetProduct(*baseURL)
-			total += benchGetCheckouts(*baseURL, productID, productQuantity)
-
-			if total == 0 {
-				score <- total
+			result := benchGetProducts(*baseURL)
+			if result == 0 {
+				score <- uint(0)
 				return
 			}
+			total += result
+
+			result = benchPostCheckout(*baseURL, productID, productQuantity)
+			if result == 0 {
+				score <- uint(0)
+				return
+			}
+			total += result
+
+			result = benchGetProduct(*baseURL)
+			if result == 0 {
+				score <- uint(0)
+				return
+			}
+			total += result
+
+			result = benchGetCheckouts(*baseURL, productID, productQuantity)
+			if result == 0 {
+				score <- uint(0)
+				return
+			}
+			total += result
 		}
 	}
 }
