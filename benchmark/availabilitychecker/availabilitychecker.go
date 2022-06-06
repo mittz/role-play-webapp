@@ -316,6 +316,7 @@ func (ac *AvailabilityChecker) RateCloudSQL(labelKey string, labelVal string) (i
 	}
 
 	sqls := make(map[string]CloudSQL)
+	regions := make(map[string]interface{})
 	for _, instance := range instances.Items {
 		if instance.State == "RUNNABLE" && instance.Settings.UserLabels[labelKey] == labelVal {
 			sqls[instance.Name] = CloudSQL{
@@ -324,6 +325,7 @@ func (ac *AvailabilityChecker) RateCloudSQL(labelKey string, labelVal string) (i
 				Status:           instance.State,
 				MachineType:      instance.Settings.Tier,
 			}
+			regions[instance.Region] = struct{}{}
 		}
 	}
 
@@ -333,6 +335,13 @@ func (ac *AvailabilityChecker) RateCloudSQL(labelKey string, labelVal string) (i
 
 	for _, sql := range sqls {
 		if sql.AvailabilityType == "REGIONAL" {
+			// If this has a regional replica in a different region from the master node,
+			// this tool considers the architecture as multi-regional
+			// because Cloud SQL supports promoting cross-region replica
+			// https://cloud.google.com/sql/docs/mysql/replication/cross-region-replicas.
+			if len(regions) >= 2 {
+				return RATE_MULTI_REGIONAL, nil
+			}
 			return RATE_REGIONAL, nil
 		}
 	}
