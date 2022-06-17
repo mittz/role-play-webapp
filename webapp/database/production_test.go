@@ -3,11 +3,10 @@ package database
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 func NewMockDatabaseHandler() (DatabaseHandler, sqlmock.Sqlmock, error) {
@@ -16,26 +15,16 @@ func NewMockDatabaseHandler() (DatabaseHandler, sqlmock.Sqlmock, error) {
 		return nil, nil, err
 	}
 
-	gdbconn, err := gorm.Open(postgres.New(postgres.Config{
-		Conn: mockDB,
-	}), &gorm.Config{})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	dbh := NewProdDatabaseHandler(gdbconn)
+	dbh := NewProdDatabaseHandler(mockDB)
 
 	return dbh, mock, nil
 }
 
 func TestNewProdDatabaseHandler(t *testing.T) {
 	mockDB, _, err := sqlmock.New()
-	gdbconn, err := gorm.Open(postgres.New(postgres.Config{
-		Conn: mockDB,
-	}), &gorm.Config{})
 	assert.Nil(t, err)
 
-	dbh := NewProdDatabaseHandler(gdbconn)
+	dbh := NewProdDatabaseHandler(mockDB)
 	assert.NotNil(t, dbh)
 }
 
@@ -52,10 +41,10 @@ func TestGetProduct(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := Product{Model: gorm.Model{ID: uint(1)}, Name: "hunters-race-Vk3QiwyrAUA", Price: uint(150), Image: "/assets/hunters-race-Vk3QiwyrAUA-unsplash.jpg"}
+	p := Product{ID: 1, Name: "", Price: 150, Image: "/assets/hunters-race-Vk3QiwyrAUA-unsplash.jpg"}
 
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT * FROM "products" WHERE "products"."id" = $1 AND "products"."deleted_at" IS NULL ORDER BY "products"."id" LIMIT 1`)).
+		`SELECT id, name, price, image FROM products WHERE id = $1`)).
 		WithArgs(p.ID).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "price", "image"}).
 			AddRow(p.ID, p.Name, p.Price, p.Image))
@@ -63,7 +52,7 @@ func TestGetProduct(t *testing.T) {
 	product, err := mdb.GetProduct(p.ID)
 
 	assert.Nil(t, err)
-	assert.Equal(t, product, p)
+	assert.Equal(t, p, product)
 }
 
 func TestGetProducts(t *testing.T) {
@@ -72,17 +61,20 @@ func TestGetProducts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	productID1, productID2 := uint(1), uint(2)
+	p1 := Product{ID: 1, Name: "Product00001", Price: 150, Image: "product00001.jpg"}
+	p2 := Product{ID: 2, Name: "Product00002", Price: 200, Image: "product00002.jpg"}
 
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT * FROM "products" WHERE "products"."deleted_at" IS NULL`)).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).
-			AddRow(productID1).
-			AddRow(productID2))
+		`SELECT id, name, price, image FROM products`)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "price", "image"}).
+			AddRow(p1.ID, p1.Name, p1.Price, p1.Image).
+			AddRow(p2.ID, p2.Name, p2.Price, p2.Image))
 
 	products, err := mdb.GetProducts()
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(products))
+	assert.Equal(t, p1, products[0])
+	assert.Equal(t, p2, products[1])
 }
 
 func TestGetCheckouts(t *testing.T) {
@@ -91,15 +83,45 @@ func TestGetCheckouts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userID := uint(1)
-	checkout1 := Checkout{UserID: userID, ProductID: uint(1)}
-	checkout2 := Checkout{UserID: userID, ProductID: uint(2)}
+	userID, userName := 1, "user00001"
+	checkout1 := Checkout{
+		ID: "dummy-checkout-00001",
+		User: User{
+			ID:   userID,
+			Name: userName,
+		},
+		Product: Product{
+			ID:    1,
+			Name:  "product00001",
+			Price: 100,
+			Image: "product00001.png",
+		},
+		ProductQuantity: 1,
+		CreatedAt:       time.Now(),
+	}
+
+	checkout2 := Checkout{
+		ID: "dummy-checkout-00002",
+		User: User{
+			ID:   userID,
+			Name: userName,
+		},
+		Product: Product{
+			ID:    1,
+			Name:  "product00002",
+			Price: 200,
+			Image: "product00002.png",
+		},
+		ProductQuantity: 2,
+		CreatedAt:       time.Now(),
+	}
 
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT "checkouts"."id","checkouts"."created_at","checkouts"."updated_at","checkouts"."deleted_at","checkouts"."user_id","checkouts"."product_id","checkouts"."product_quantity","User"."id" AS "User__id","User"."created_at" AS "User__created_at","User"."updated_at" AS "User__updated_at","User"."deleted_at" AS "User__deleted_at","User"."name" AS "User__name","User"."password" AS "User__password","Product"."id" AS "Product__id","Product"."created_at" AS "Product__created_at","Product"."updated_at" AS "Product__updated_at","Product"."deleted_at" AS "Product__deleted_at","Product"."name" AS "Product__name","Product"."price" AS "Product__price","Product"."image" AS "Product__image" FROM "checkouts" LEFT JOIN "users" "User" ON "checkouts"."user_id" = "User"."id" AND "User"."deleted_at" IS NULL LEFT JOIN "products" "Product" ON "checkouts"."product_id" = "Product"."id" AND "Product"."deleted_at" IS NULL WHERE "checkouts"."deleted_at" IS NULL`)).
-		WillReturnRows(sqlmock.NewRows([]string{"user_id", "product_id"}).
-			AddRow(userID, checkout1.ProductID).
-			AddRow(userID, checkout2.ProductID))
+		`SELECT checkouts.id AS checkout_id, users.id AS user_id, users.name AS user_name, products.id AS product_id, products.name AS product_name, products.price AS product_price, products.image AS product_image, checkouts.product_quantity AS checkout_product_quantity, checkouts.created_at AS checkout_created_at FROM checkouts LEFT JOIN users ON checkouts.user_id = users.id LEFT JOIN products ON checkouts.product_id = products.id WHERE users.id = $1`)).
+		WithArgs(userID).
+		WillReturnRows(sqlmock.NewRows([]string{"checkout_id", "user_id", "user_name", "product_id", "product_name", "product_price", "product_image", "checkout_product_quantity", "checkout_created_at"}).
+			AddRow(checkout1.ID, checkout1.User.ID, checkout1.User.Name, checkout1.Product.ID, checkout1.Product.Name, checkout1.Product.Price, checkout1.Product.Image, checkout1.ProductQuantity, checkout1.CreatedAt).
+			AddRow(checkout2.ID, checkout2.User.ID, checkout2.User.Name, checkout2.Product.ID, checkout2.Product.Name, checkout2.Product.Price, checkout2.Product.Image, checkout2.ProductQuantity, checkout2.CreatedAt))
 
 	checkouts, err := mdb.GetCheckouts(userID)
 	assert.Nil(t, err)
@@ -118,13 +140,29 @@ func TestGetCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkoutID, userID, productID, productQuantity := uint(1), uint(1), uint(1), uint(1)
+	checkout := Checkout{
+		ID: "dummy-checkout-00001",
+		User: User{
+			ID:   1,
+			Name: "user00001",
+		},
+		Product: Product{
+			ID:    1,
+			Name:  "Product00001",
+			Price: 100,
+			Image: "product00001.png",
+		},
+		ProductQuantity: 1,
+		CreatedAt:       time.Now(),
+	}
 
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT "checkouts"."id","checkouts"."created_at","checkouts"."updated_at","checkouts"."deleted_at","checkouts"."user_id","checkouts"."product_id","checkouts"."product_quantity","Product"."id" AS "Product__id","Product"."created_at" AS "Product__created_at","Product"."updated_at" AS "Product__updated_at","Product"."deleted_at" AS "Product__deleted_at","Product"."name" AS "Product__name","Product"."price" AS "Product__price","Product"."image" AS "Product__image" FROM "checkouts" LEFT JOIN "products" "Product" ON "checkouts"."product_id" = "Product"."id" AND "Product"."deleted_at" IS NULL WHERE "checkouts"."id" = $1 AND "checkouts"."deleted_at" IS NULL`)).
-		WithArgs(checkoutID).
-		WillReturnRows(sqlmock.NewRows([]string{"checkout_id", "user_id", "product_id", "product_quantity"}).AddRow(checkoutID, userID, productID, productQuantity))
+		`SELECT checkouts.id, users.id, users.name, products.id, products.name, products.price, products.image, checkouts.product_quantity, checkouts.created_at FROM checkouts LEFT JOIN users ON checkouts.user_id = users.id LEFT JOIN products ON checkouts.product_id = products.id WHERE checkouts.id = $1`)).
+		WithArgs(checkout.ID).
+		WillReturnRows(sqlmock.NewRows([]string{"checkout_id", "user_id", "user_name", "product_id", "product_name", "product_price", "product_image", "product_quantity", "created_at"}).
+			AddRow(checkout.ID, checkout.User.ID, checkout.User.Name, checkout.Product.ID, checkout.Product.Name, checkout.Product.Price, checkout.Product.Image, checkout.ProductQuantity, checkout.CreatedAt))
 
-	_, err = mdb.GetCheckout(checkoutID)
+	c, err := mdb.GetCheckout(checkout.ID)
 	assert.Nil(t, err)
+	assert.Equal(t, checkout, c)
 }
