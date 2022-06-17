@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mittz/role-play-webapp/webapp/database"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -99,13 +100,18 @@ func getProductEndpoint(c *gin.Context) {
 }
 
 func getProductsEndpoint(c *gin.Context) {
+	ctx := c.Request.Context()
+	tracer := otel.GetTracerProvider().Tracer("scstore/endpoints")
+	ctx, span := tracer.Start(ctx, "get-products")
+	defer span.End()
+
 	products, err := dbHandler.GetProducts()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
 		return
 	}
 
-	otelgin.HTML(c, http.StatusOK, "products.html", gin.H{
+	c.HTML(http.StatusOK, "products.html", gin.H{
 		"title":    "Products",
 		"products": products,
 	})
@@ -131,7 +137,7 @@ func SetupRouter(dbh database.DatabaseHandler, assetsDir string, templatesDirMat
 	//   tp := sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.TraceIDRatioBased(0.0001)), ...)
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	defer tp.ForceFlush(ctx) // flushes any pending spans
-	otelgin.WithTracerProvider(tp)
+	otel.SetTracerProvider(tp)
 
 	router := gin.Default()
 	router.Use(otelgin.Middleware("scstore"))
