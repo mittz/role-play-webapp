@@ -11,6 +11,7 @@ import (
 	texporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"github.com/gin-gonic/gin"
 	"github.com/mittz/role-play-webapp/webapp/database"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -99,11 +100,6 @@ func getProductEndpoint(c *gin.Context) {
 }
 
 func getProductsEndpoint(c *gin.Context) {
-	ctx := c.Request.Context()
-	tracer := otel.GetTracerProvider().Tracer("scstore/endpoints")
-	ctx, span := tracer.Start(ctx, "get-products")
-	defer span.End()
-
 	products, err := dbHandler.GetProducts()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
@@ -139,6 +135,7 @@ func SetupRouter(dbh database.DatabaseHandler, assetsDir string, templatesDirMat
 	otel.SetTracerProvider(tp)
 
 	router := gin.Default()
+	router.Use(otelgin.Middleware("scstore"))
 
 	router.Static("/assets", assetsDir)
 	router.StaticFile("/favicon.ico", filepath.Join(assetsDir, "favicon.ico"))
