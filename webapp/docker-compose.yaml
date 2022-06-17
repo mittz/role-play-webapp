@@ -10,6 +10,7 @@ services:
       - DB_PASSWORD=scstore
       - DB_NAME=scstore
       - GIN_MODE=release
+      - GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
     ports:
       - "80:8080"
     depends_on:
