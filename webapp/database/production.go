@@ -30,34 +30,62 @@ func (dbh ProdDatabaseHandler) InitDatabase() error {
 
 	db := dbh.DB
 
-	queryDropTables := "DROP TABLE IF EXISTS products, users, checkouts"
-	if _, err := db.Exec(queryDropTables); err != nil {
-		return err
+	// Don't use "IF EXISTS" as it is not supported by Spanner PGAdapter.
+	queryCheckProductsTable := "SELECT * FROM products"
+	queryDropProductsTables := "DROP TABLE products"
+	_, err = db.Query(queryCheckProductsTable)
+	tableExists := (err == nil)
+	if tableExists {
+		if _, err := db.Exec(queryDropProductsTables); err != nil {
+			return err
+		}
 	}
 
+	queryCheckUsersTable := "SELECT * FROM users"
+	queryDropUsersTables := "DROP TABLE users"
+	_, err = db.Query(queryCheckUsersTable)
+	tableExists = (err == nil)
+	if tableExists {
+		if _, err := db.Exec(queryDropUsersTables); err != nil {
+			return err
+		}
+	}
+
+	queryCheckCheckoutsTable := "SELECT * FROM checkouts"
+	queryDropCheckoutsTables := "DROP TABLE checkouts"
+	if _, err := db.Exec(queryCheckCheckoutsTable); err != nil {
+		if _, err := db.Exec(queryDropCheckoutsTables); err != nil {
+			return err
+		}
+	}
+
+	// Don't use "IF EXISTS" as it is not supported by Spanner PGAdapter.
 	queryCreateProductsTable := `
-	CREATE TABLE IF NOT EXISTS products (
-		id    int          PRIMARY KEY,
-		name  varchar(20)  NOT NULL,
-		price int          NOT NULL,
-		image varchar(100) NOT NULL
+	CREATE TABLE products (
+		id bigint NOT NULL,
+		name character varying(20) NOT NULL,
+		price bigint NOT NULL,
+		image character varying(100) NOT NULL,
+		PRIMARY KEY(id)
 	)
 	`
 
 	queryCreateUsersTable := `
-	CREATE TABLE IF NOT EXISTS users (
-		id    int          PRIMARY KEY,
-		name  varchar(20)  NOT NULL
+	CREATE TABLE users (
+		id bigint NOT NULL,
+		name character varying(20) NOT NULL,
+		PRIMARY KEY(id)
 	)
 	`
 
 	queryCreateCheckoutsTable := `
-	CREATE TABLE IF NOT EXISTS checkouts (
-		id               varchar(40) PRIMARY KEY,
-		user_id          int,
-		product_id       int,
-		product_quantity int,
-		created_at       date
+	CREATE TABLE checkouts (
+		id character varying(40) NOT NULL,
+		user_id bigint,
+		product_id bigint,
+		product_quantity bigint,
+		created_at date,
+		PRIMARY KEY(id)
 	)
 	`
 
