@@ -53,7 +53,9 @@ func (dbh ProdDatabaseHandler) InitDatabase() error {
 
 	queryCheckCheckoutsTable := "SELECT * FROM checkouts"
 	queryDropCheckoutsTables := "DROP TABLE checkouts"
-	if _, err := db.Exec(queryCheckCheckoutsTable); err != nil {
+	_, err = db.Query(queryCheckCheckoutsTable)
+	tableExists = (err == nil)
+	if tableExists {
 		if _, err := db.Exec(queryDropCheckoutsTables); err != nil {
 			return err
 		}
