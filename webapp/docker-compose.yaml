@@ -2,6 +2,7 @@ version: "3"
 services:
   scstore-app:
     image: scstore:1.0.0
+    container_name: "scstore-app"
     environment:
       - DB_HOSTNAME=scstore-database
       - DB_PORT=5432

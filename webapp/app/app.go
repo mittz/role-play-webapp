@@ -13,12 +13,8 @@ var dbHandler database.DatabaseHandler
 
 // getUserID always returns the same id which is for scstore user.
 // This should be updated when this app implements an authentication feature.
-func getUserID() uint {
-	return uint(2)
-}
-
-func getIndexEndpoint(c *gin.Context) {
-	c.Redirect(http.StatusPermanentRedirect, "/products")
+func getUserID() int {
+	return 2
 }
 
 func postInitEndpoint(c *gin.Context) {
@@ -59,7 +55,7 @@ func postCheckoutEndpoint(c *gin.Context) {
 		return
 	}
 
-	checkoutID, err := dbHandler.CreateCheckout(uint(userID), uint(productID), uint(productQuantity))
+	checkoutID, err := dbHandler.CreateCheckout(userID, productID, productQuantity)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
 		return
@@ -84,7 +80,7 @@ func getProductEndpoint(c *gin.Context) {
 		return
 	}
 
-	product, err := dbHandler.GetProduct(uint(productID))
+	product, err := dbHandler.GetProduct(productID)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "%v", err)
 		return
@@ -117,7 +113,7 @@ func SetupRouter(dbh database.DatabaseHandler, assetsDir string, templatesDirMat
 	router.StaticFile("/favicon.ico", filepath.Join(assetsDir, "favicon.ico"))
 	router.LoadHTMLGlob(templatesDirMatch)
 
-	router.GET("/", getIndexEndpoint)
+	router.GET("/", getProductsEndpoint)
 
 	router.POST("/admin/init", postInitEndpoint)
 

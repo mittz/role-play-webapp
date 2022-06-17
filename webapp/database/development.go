@@ -1,22 +1,24 @@
 package database
 
-import "gorm.io/gorm"
+import (
+	"database/sql"
+)
 
 type DevDatabaseHandler struct {
-	Conn *gorm.DB
+	DB *sql.DB
 }
 
-func NewDevDatabaseHandler(c *gorm.DB) DevDatabaseHandler {
-	return DevDatabaseHandler{Conn: c}
+func NewDevDatabaseHandler(db *sql.DB) DevDatabaseHandler {
+	return DevDatabaseHandler{DB: db}
 }
 
 func (dbh DevDatabaseHandler) InitDatabase() error {
 	return nil
 }
 
-func (dbh DevDatabaseHandler) GetProduct(id uint) (Product, error) {
+func (dbh DevDatabaseHandler) GetProduct(id int) (Product, error) {
 	product := Product{
-		Model: gorm.Model{ID: uint(1)}, Name: "product1", Price: uint(100), Image: "image/product1.png",
+		ID: 1, Name: "product1", Price: 100, Image: "image/product1.png",
 	}
 
 	return product, nil
@@ -24,37 +26,37 @@ func (dbh DevDatabaseHandler) GetProduct(id uint) (Product, error) {
 
 func (dbh DevDatabaseHandler) GetProducts() ([]Product, error) {
 	products := []Product{
-		{Model: gorm.Model{ID: uint(1)}, Name: "product1", Price: uint(100), Image: "image/product1.png"},
-		{Model: gorm.Model{ID: uint(2)}, Name: "product2", Price: uint(200), Image: "image/product2.png"},
+		{ID: 1, Name: "product1", Price: 100, Image: "image/product1.png"},
+		{ID: 2, Name: "product2", Price: 200, Image: "image/product2.png"},
 	}
 
 	return products, nil
 }
 
-func (dbh DevDatabaseHandler) GetCheckouts(userID uint) ([]Checkout, error) {
+func (dbh DevDatabaseHandler) GetCheckouts(userID int) ([]Checkout, error) {
 	checkouts := []Checkout{
 		{
-			UserID:          userID,
-			Product:         Product{Price: uint(100), Image: "image/product1.png"},
-			ProductQuantity: uint(111),
+			User:            User{ID: userID},
+			Product:         Product{Price: 100, Image: "image/product1.png"},
+			ProductQuantity: 111,
 		},
 		{
-			UserID:          userID,
-			Product:         Product{Price: uint(200), Image: "image/product2.png"},
-			ProductQuantity: uint(222),
+			User:            User{ID: userID},
+			Product:         Product{Price: 200, Image: "image/product2.png"},
+			ProductQuantity: 222,
 		},
 	}
 
 	return checkouts, nil
 }
 
-func (dbh DevDatabaseHandler) CreateCheckout(userID uint, productID uint, productQuantity uint) (uint, error) {
-	return 0, nil
+func (dbh DevDatabaseHandler) CreateCheckout(userID int, productID int, productQuantity int) (string, error) {
+	return "", nil
 }
 
-func (dbh DevDatabaseHandler) GetCheckout(checkoutID uint) (Checkout, error) {
+func (dbh DevDatabaseHandler) GetCheckout(checkoutID string) (Checkout, error) {
 	checkout := Checkout{
-		Model: gorm.Model{ID: checkoutID}, Product: Product{Name: "product1", Image: "image/product1.png"}, ProductQuantity: uint(111),
+		ID: checkoutID, Product: Product{Name: "product1", Image: "image/product1.png"}, ProductQuantity: 111,
 	}
 
 	return checkout, nil

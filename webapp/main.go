@@ -1,19 +1,33 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
+
+	_ "github.com/lib/pq"
 
 	"github.com/mittz/role-play-webapp/webapp/app"
 	"github.com/mittz/role-play-webapp/webapp/database"
+	"github.com/mittz/role-play-webapp/webapp/utils"
 )
 
 func main() {
-	dbConn, err := database.InitializeProdDBConn()
+	dbInfo := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s sslmode=disable",
+		utils.GetEnvDBHostname(),
+		utils.GetEnvDBPort(),
+		utils.GetEnvDBUsername(),
+		utils.GetEnvDBName(),
+		utils.GetEnvDBPassword(),
+	)
+
+	db, err := sql.Open("postgres", dbInfo)
+	defer db.Close()
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		log.Fatal(err)
 	}
 
-	dbHandler, err := database.NewDatabaseHandler("production", dbConn)
+	dbHandler, err := database.NewDatabaseHandler("production", db)
 	if err != nil {
 		log.Fatal(err)
 	}

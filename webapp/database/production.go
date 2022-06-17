@@ -1,56 +1,102 @@
 package database
 
 import (
+	"database/sql"
 	"encoding/json"
 	"io/ioutil"
-	"log"
+	"time"
 
-	"gorm.io/gorm"
+	"github.com/google/uuid"
 )
 
 type ProdDatabaseHandler struct {
-	Conn *gorm.DB
+	DB *sql.DB
 }
 
-func NewProdDatabaseHandler(conn *gorm.DB) ProdDatabaseHandler {
-	return ProdDatabaseHandler{Conn: conn}
+func NewProdDatabaseHandler(db *sql.DB) ProdDatabaseHandler {
+	return ProdDatabaseHandler{DB: db}
 }
 
 func (dbh ProdDatabaseHandler) InitDatabase() error {
 	jsonFromFile, err := ioutil.ReadFile(InitDataJSONFileName)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	var jsonData Blob
-	err = json.Unmarshal(jsonFromFile, &jsonData)
-	if err != nil {
-		log.Fatal(err)
+	if err := json.Unmarshal(jsonFromFile, &jsonData); err != nil {
+		return err
 	}
 
-	// Drop table if exists
-	if err := dbh.Conn.Migrator().DropTable(&Product{}, &User{}, &Checkout{}); err != nil {
+	db := dbh.DB
+
+	queryDropTables := "DROP TABLE IF EXISTS products, users, checkouts"
+	if _, err := db.Exec(queryDropTables); err != nil {
 		return err
 	}
-	if err := dbh.Conn.Migrator().CreateTable(&Product{}, &User{}, &Checkout{}); err != nil {
+
+	queryCreateProductsTable := `
+	CREATE TABLE IF NOT EXISTS products (
+		id    int          PRIMARY KEY,
+		name  varchar(20)  NOT NULL,
+		price int          NOT NULL,
+		image varchar(100) NOT NULL
+	)
+	`
+
+	queryCreateUsersTable := `
+	CREATE TABLE IF NOT EXISTS users (
+		id    int          PRIMARY KEY,
+		name  varchar(20)  NOT NULL
+	)
+	`
+
+	queryCreateCheckoutsTable := `
+	CREATE TABLE IF NOT EXISTS checkouts (
+		id               varchar(40) PRIMARY KEY,
+		user_id          int,
+		product_id       int,
+		product_quantity int,
+		created_at       date
+	)
+	`
+
+	if _, err := db.Exec(queryCreateProductsTable); err != nil {
 		return err
 	}
-	if result := dbh.Conn.Model(&Product{}).Create(jsonData.Products); result.Error != nil {
-		return result.Error
+
+	if _, err := db.Exec(queryCreateUsersTable); err != nil {
+		return err
 	}
-	if result := dbh.Conn.Model(&User{}).Create(jsonData.Users); result.Error != nil {
-		return result.Error
+
+	if _, err := db.Exec(queryCreateCheckoutsTable); err != nil {
+		return err
+	}
+
+	queryInsertProduct := "INSERT INTO products VALUES($1, $2, $3, $4)"
+	for _, product := range jsonData.Products {
+		if _, err := db.Exec(queryInsertProduct, product.ID, product.Name, product.Price, product.Image); err != nil {
+			return err
+		}
+	}
+
+	queryInsertUser := "INSERT INTO users VALUES($1, $2)"
+	for _, user := range jsonData.Users {
+		if _, err := db.Exec(queryInsertUser, user.ID, user.Name); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (dbh ProdDatabaseHandler) GetProduct(id uint) (Product, error) {
+func (dbh ProdDatabaseHandler) GetProduct(id int) (Product, error) {
 	var product Product
 
-	result := dbh.Conn.First(&product, id)
-	if result.Error != nil {
-		return product, result.Error
+	db := dbh.DB
+	query := "SELECT id, name, price, image FROM products WHERE id = $1"
+	if err := db.QueryRow(query, id).Scan(&product.ID, &product.Name, &product.Price, &product.Image); err != nil {
+		return product, err
 	}
 
 	return product, nil
@@ -59,38 +105,116 @@ func (dbh ProdDatabaseHandler) GetProduct(id uint) (Product, error) {
 func (dbh ProdDatabaseHandler) GetProducts() ([]Product, error) {
 	var products []Product
 
-	result := dbh.Conn.Find(&products)
-	if result.Error != nil {
-		return products, result.Error
+	db := dbh.DB
+	query := "SELECT id, name, price, image FROM products"
+	rows, err := db.Query(query)
+	if err != nil {
+		return products, err
+	}
+
+	for rows.Next() {
+		var product Product
+		if err := rows.Scan(&product.ID, &product.Name, &product.Price, &product.Image); err != nil {
+			return products, err
+		}
+
+		products = append(products, product)
 	}
 
 	return products, nil
 }
 
-func (dbh ProdDatabaseHandler) GetCheckouts(userID uint) ([]Checkout, error) {
+func (dbh ProdDatabaseHandler) GetCheckouts(userID int) ([]Checkout, error) {
 	var checkouts []Checkout
 
-	// TODO: Consider if index handling is required
-	err := dbh.Conn.Joins("User").Joins("Product").Find(&checkouts).Where("users.id =?", userID).Error
+	db := dbh.DB
+	query := `
+	SELECT
+	  checkouts.id               AS checkout_id,
+	  users.id                   AS user_id,
+	  users.name                 AS user_name,
+	  products.id                AS product_id,
+	  products.name              AS product_name,
+	  products.price             AS product_price,
+	  products.image             AS product_image,
+	  checkouts.product_quantity AS checkout_product_quantity,
+	  checkouts.created_at       AS checkout_created_at
+	FROM checkouts
+	LEFT JOIN users ON checkouts.user_id = users.id
+	LEFT JOIN products ON checkouts.product_id = products.id
+	WHERE users.id = $1
+	`
 
-	return checkouts, err
-}
-
-func (dbh ProdDatabaseHandler) CreateCheckout(userID uint, productID uint, productQuantity uint) (uint, error) {
-	checkout := Checkout{
-		UserID:          userID,
-		ProductID:       productID,
-		ProductQuantity: productQuantity,
+	rows, err := db.Query(query, userID)
+	if err != nil {
+		return checkouts, err
 	}
-	result := dbh.Conn.Create(&checkout)
 
-	return checkout.ID, result.Error
+	for rows.Next() {
+		var checkout Checkout
+		if err := rows.Scan(&checkout.ID, &checkout.User.ID, &checkout.User.Name, &checkout.Product.ID, &checkout.Product.Name, &checkout.Product.Price, &checkout.Product.Image, &checkout.ProductQuantity, &checkout.CreatedAt); err != nil {
+			return checkouts, err
+		}
+
+		checkouts = append(checkouts, checkout)
+	}
+
+	return checkouts, nil
 }
 
-func (dbh ProdDatabaseHandler) GetCheckout(checkoutID uint) (Checkout, error) {
-	var checkout Checkout
+func (dbh ProdDatabaseHandler) CreateCheckout(userID int, productID int, productQuantity int) (string, error) {
+	uuidObj, err := uuid.NewRandom()
+	checkoutID := uuidObj.String()
+	if err != nil {
+		return "", nil
+	}
 
-	err := dbh.Conn.Joins("Product").Find(&checkout, checkoutID).Error
+	db := dbh.DB
+	query := "INSERT INTO checkouts (id, user_id, product_id, product_quantity, created_at) VALUES ($1, $2, $3, $4, $5)"
+	if _, err := db.Exec(query, checkoutID, userID, productID, productQuantity, time.Now()); err != nil {
+		return "", err
+	}
 
-	return checkout, err
+	return checkoutID, nil
+}
+
+func (dbh ProdDatabaseHandler) GetCheckout(checkoutID string) (Checkout, error) {
+	checkout := Checkout{
+		Product: Product{},
+		User:    User{},
+	}
+
+	// err := dbh.Conn.Joins("Product").Find(&checkout, checkoutID).Error
+	db := dbh.DB
+	query := `
+	SELECT
+	  checkouts.id,
+	  users.id,
+	  users.name,
+	  products.id,
+	  products.name,
+	  products.price,
+	  products.image,
+	  checkouts.product_quantity,
+	  checkouts.created_at
+	FROM checkouts
+	LEFT JOIN users ON checkouts.user_id = users.id
+	LEFT JOIN products ON checkouts.product_id = products.id
+	WHERE checkouts.id = $1
+	`
+	if err := db.QueryRow(query, checkoutID).Scan(
+		&checkout.ID,
+		&checkout.User.ID,
+		&checkout.User.Name,
+		&checkout.Product.ID,
+		&checkout.Product.Name,
+		&checkout.Product.Price,
+		&checkout.Product.Image,
+		&checkout.ProductQuantity,
+		&checkout.CreatedAt,
+	); err != nil {
+		return checkout, err
+	}
+
+	return checkout, nil
 }
