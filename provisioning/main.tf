@@ -10,7 +10,7 @@ provider "google" {
   credentials = file(var.credentials_file)
   version = "3.5.0"
   project = var.project
-  ＃　TF_VAR_project="<PROJECT_ID>"　の方がいいのかも
+  ＃TF_VAR_project="<PROJECT_ID>"　の方がいいのかも
   region  = "asia-northeast1"
   zone    = "asia-northeast1-c"
 }
