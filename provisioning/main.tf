@@ -2,18 +2,21 @@ terraform {
   required_providers {
     google = {
       source = "hashicorp/google"
+      version = "3.5.0"
     }
   }
 }
 
 provider "google" {
-  credentials = file(var.credentials_file)
-  version = "3.5.0"
+  #credentials = file(var.credentials_file)
   project = var.project
-  ＃TF_VAR_project="<PROJECT_ID>"　の方がいいのかも
   region  = "asia-northeast1"
   zone    = "asia-northeast1-c"
 }
+resource "google_project_service" "enable_api" {
+  service = "compute.googleapis.com"
+}
+
 resource "google_compute_network" "vpc_network" {
   name = "my-network"
 }
@@ -40,3 +43,4 @@ resource "google_compute_address" "vm_static_ip" {
 }
 
   
+
