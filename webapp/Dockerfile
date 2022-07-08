@@ -12,7 +12,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o $APP_NAME
 
 
-FROM scratch
+FROM alpine:3.15.4
 
 LABEL service_name="scstore"
 LABEL service_role="webapp"
@@ -21,6 +21,7 @@ ENV APP_NAME=scstore
 ENV ROOT=/go/src/${APP_NAME}
 COPY . /
 COPY --from=builder ${ROOT}/${APP_NAME} ${APP_NAME}
+RUN apk add --no-cache ca-certificates
 
 EXPOSE 8080
 ENTRYPOINT ["/scstore"]
