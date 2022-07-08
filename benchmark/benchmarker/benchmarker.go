@@ -29,6 +29,7 @@ const (
 
 var (
 	jobInQueue sync.Map
+	httpClient *http.Client
 )
 
 type Worker struct {
@@ -84,10 +85,23 @@ func (b Benchmarker) Benchmark(ctx context.Context, endpoint string, score chan<
 	}
 }
 
+func newHTTPClient() *http.Client {
+	if httpClient == nil {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				MaxConnsPerHost: 20,
+			},
+		}
+	}
+
+	return httpClient
+}
+
 func benchGetProducts(baseURL url.URL) uint {
 	getProductsURL := baseURL
 	getProductsURL.Path = path.Join(getProductsURL.Path, "/products")
-	resp, err := http.Get(getProductsURL.String())
+	httpClient := newHTTPClient()
+	resp, err := httpClient.Get(getProductsURL.String())
 	if err != nil {
 		log.Printf("%v\n", err)
 		return 0
@@ -145,7 +159,8 @@ func benchPostCheckout(baseURL url.URL, productID int, productQuantity int) uint
 	}
 	postCheckout := baseURL
 	postCheckout.Path = path.Join(postCheckout.Path, "/checkout")
-	resp, err := http.PostForm(postCheckout.String(), data)
+	httpClient := newHTTPClient()
+	resp, err := httpClient.PostForm(postCheckout.String(), data)
 	if err != nil {
 		return 0
 	}
@@ -166,7 +181,7 @@ func benchPostCheckout(baseURL url.URL, productID int, productQuantity int) uint
 		imagePath = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, imagePath)
 	}
 
-	respImage, err := http.Get(imagePath)
+	respImage, err := httpClient.Get(imagePath)
 	if err != nil {
 		log.Printf("%v\n", err)
 		return 0
@@ -192,7 +207,8 @@ func benchGetProduct(baseURL url.URL) uint {
 	getProductURL := baseURL
 	productID := rand.Intn(productmanager.GetNumOfProducts()-1) + 1 // Exclude 0
 	getProductURL.Path = path.Join(getProductURL.Path, "/product", fmt.Sprintf("%d", productID))
-	resp, err := http.Get(getProductURL.String())
+	httpClient := newHTTPClient()
+	resp, err := httpClient.Get(getProductURL.String())
 	if err != nil {
 		log.Printf("%v\n", err)
 		return 0
@@ -214,7 +230,7 @@ func benchGetProduct(baseURL url.URL) uint {
 		imagePath = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, imagePath)
 	}
 
-	respImage, err := http.Get(imagePath)
+	respImage, err := httpClient.Get(imagePath)
 	if err != nil {
 		log.Printf("%v\n", err)
 		return 0
@@ -237,7 +253,8 @@ func benchGetProduct(baseURL url.URL) uint {
 func benchGetCheckouts(baseURL url.URL, productID int, productQuantity int) uint {
 	getCheckoutsURL := baseURL
 	getCheckoutsURL.Path = path.Join(getCheckoutsURL.Path, "/checkouts")
-	resp, err := http.Get(getCheckoutsURL.String())
+	httpClient := newHTTPClient()
+	resp, err := httpClient.Get(getCheckoutsURL.String())
 	if err != nil {
 		return 0
 	}
@@ -263,7 +280,7 @@ func benchGetCheckouts(baseURL url.URL, productID int, productQuantity int) uint
 		imagePath = fmt.Sprintf("%s://%s%s", baseURL.Scheme, baseURL.Host, imagePath)
 	}
 
-	respImage, err := http.Get(imagePath)
+	respImage, err := httpClient.Get(imagePath)
 	if err != nil {
 		log.Printf("%v\n", err)
 		return 0
